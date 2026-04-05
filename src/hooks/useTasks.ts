@@ -6,7 +6,14 @@ import { createId } from '../utils/id';
 export function useTasks() {
   const { tasks, upsertTask, removeTask } = useAppData();
 
-  const addTask = (input: Omit<Task, 'id'>) => upsertTask({ ...input, id: createId() });
+  const addTask = (input: Omit<Task, 'id'>) => {
+    const nums = tasks
+      .filter((t) => t.projectId === input.projectId)
+      .map((t) => t.number);
+    const number =
+      input.number > 0 ? input.number : (nums.length ? Math.max(...nums) : 0) + 1;
+    return upsertTask({ ...input, id: createId(), number });
+  };
 
   const updateTask = (id: string, patch: Partial<Omit<Task, 'id'>>) => {
     const prev = tasks.find((t) => t.id === id);

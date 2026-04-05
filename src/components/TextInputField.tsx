@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 
 type Props = TextInputProps & {
   disabled?: boolean;
@@ -12,10 +12,30 @@ export function TextInputField({
   multiline,
   ...rest
 }: Props) {
+  const t = useAppTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        input: {
+          borderWidth: 1,
+          borderColor: t.colors.border,
+          borderRadius: t.radius.sm,
+          paddingHorizontal: t.spacing.sm + 4,
+          paddingVertical: t.spacing.sm + 2,
+          fontSize: 16,
+          color: t.colors.text,
+          backgroundColor: t.colors.surface,
+        },
+        multiline: { minHeight: 88, textAlignVertical: 'top' },
+        disabled: { opacity: 0.55 },
+      }),
+    [t],
+  );
+
   return (
     <TextInput
       editable={!disabled}
-      placeholderTextColor={theme.colors.muted}
+      placeholderTextColor={t.colors.muted}
       multiline={multiline}
       style={[
         styles.input,
@@ -27,18 +47,3 @@ export function TextInputField({
     />
   );
 }
-
-const styles = StyleSheet.create({
-  input: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.spacing.sm + 4,
-    paddingVertical: theme.spacing.sm + 2,
-    fontSize: 16,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-  },
-  multiline: { minHeight: 88, textAlignVertical: 'top' },
-  disabled: { opacity: 0.55 },
-});

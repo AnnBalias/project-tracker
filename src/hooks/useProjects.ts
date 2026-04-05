@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppData } from '../store/AppDataContext';
-import type { ExpenseCategory, Project } from '../types';
+import type { ExpenseCategory, Project, TaskType } from '../types';
 import { createId } from '../utils/id';
 
 export function useProjects() {
@@ -10,13 +10,35 @@ export function useProjects() {
     removeProject,
     upsertExpenseCategory,
     removeExpenseCategory,
+    upsertTaskType,
+    removeTaskType,
   } = useAppData();
 
-  const { projects, expenseCategories } = profile;
+  const { projects, expenseCategories, taskTypes } = profile;
 
   const activeProjects = useMemo(
     () => projects.filter((p) => !p.archived),
     [projects],
+  );
+
+  const activeExpenseCategories = useMemo(
+    () => expenseCategories.filter((c) => !c.archived),
+    [expenseCategories],
+  );
+
+  const archivedExpenseCategories = useMemo(
+    () => expenseCategories.filter((c) => c.archived),
+    [expenseCategories],
+  );
+
+  const activeTaskTypes = useMemo(
+    () => taskTypes.filter((x) => !x.archived),
+    [taskTypes],
+  );
+
+  const archivedTaskTypes = useMemo(
+    () => taskTypes.filter((x) => x.archived),
+    [taskTypes],
   );
 
   const addProject = (input: Omit<Project, 'id'>) =>
@@ -33,7 +55,11 @@ export function useProjects() {
   };
 
   const addExpenseCategory = (input: Omit<ExpenseCategory, 'id'>) =>
-    upsertExpenseCategory({ ...input, id: createId() });
+    upsertExpenseCategory({
+      ...input,
+      id: createId(),
+      archived: input.archived ?? false,
+    });
 
   const updateExpenseCategory = (
     id: string,
@@ -44,6 +70,13 @@ export function useProjects() {
     return upsertExpenseCategory({ ...prev, ...patch });
   };
 
+  const addTaskType = (input: Omit<TaskType, 'id'>) =>
+    upsertTaskType({
+      ...input,
+      id: createId(),
+      archived: input.archived ?? false,
+    });
+
   const getProjectById = useMemo(
     () => (id: string) => projects.find((p) => p.id === id),
     [projects],
@@ -53,6 +86,11 @@ export function useProjects() {
     projects,
     activeProjects,
     expenseCategories,
+    activeExpenseCategories,
+    archivedExpenseCategories,
+    taskTypes,
+    activeTaskTypes,
+    archivedTaskTypes,
     addProject,
     updateProject,
     upsertProject,
@@ -62,5 +100,8 @@ export function useProjects() {
     upsertExpenseCategory,
     removeExpenseCategory,
     getProjectById,
+    addTaskType,
+    upsertTaskType,
+    removeTaskType,
   };
 }

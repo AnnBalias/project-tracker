@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ModalMode, Task, TaskStatus } from '../types';
-import { theme } from '../theme/theme';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ModalMode, Task, TaskPriority, TaskStatus } from '../types';
+import { useAppTheme } from '../store/ThemeContext';
 import {
   calendarKeyToDisplay,
   combineDateAndTime,
@@ -12,6 +12,7 @@ import {
 } from '../utils/dateTime';
 import { getTaskCalendarDay } from '../utils/calendarHelpers';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
@@ -24,10 +25,17 @@ type Props = {
   dateKey: string;
   initial?: Task | null;
   projectIds: { id: string; name: string }[];
+  taskTypes?: { id: string; name: string; color: string }[];
   onSave: (t: Task) => void;
   onDelete?: (id: string) => void;
   onRequestEdit?: () => void;
 };
+
+const PRIORITIES: { key: TaskPriority; label: string }[] = [
+  { key: 'low', label: 'Низький' },
+  { key: 'medium', label: 'Середній' },
+  { key: 'high', label: 'Високий' },
+];
 
 const STATUSES: { key: TaskStatus; label: string }[] = [
   { key: 'planned', label: 'Заплановано' },
@@ -39,6 +47,7 @@ const STATUSES: { key: TaskStatus; label: string }[] = [
 
 function emptyTask(dateKey: string, projectId: string): Task {
   const d = parseDateKey(dateKey);
+  const ymd = dateKey;
   return {
     id: '',
     title: '',
@@ -47,6 +56,12 @@ function emptyTask(dateKey: string, projectId: string): Task {
     endTime: combineDateAndTime(d, '10:00'),
     projectId,
     status: 'planned',
+    typeId: null,
+    number: 0,
+    priority: 'medium',
+    stage: '',
+    startDate: ymd,
+    endDate: ymd,
   };
 }
 
@@ -60,12 +75,20 @@ export function TaskEditorModal({
   onSave,
   onDelete,
   onRequestEdit,
+  taskTypes = [],
 }: Props) {
+  const t = useAppTheme();
   const defaultProjectId = projectIds[0]?.id ?? '';
   const [draft, setDraft] = useState<Task>(() => emptyTask(dateKey, defaultProjectId));
   const [startHm, setStartHm] = useState('09:00');
   const [endHm, setEndHm] = useState('10:00');
   const [movedDateDisplay, setMovedDateDisplay] = useState(() =>
+    calendarKeyToDisplay(dateKey),
+  );
+  const [startDateDisplay, setStartDateDisplay] = useState(() =>
+    calendarKeyToDisplay(dateKey),
+  );
+  const [endDateDisplay, setEndDateDisplay] = useState(() =>
     calendarKeyToDisplay(dateKey),
   );
 
@@ -77,15 +100,45 @@ export function TaskEditorModal({
       setStartHm('09:00');
       setEndHm('10:00');
       setMovedDateDisplay(calendarKeyToDisplay(dateKey));
+      const dpy = calendarKeyToDisplay(dateKey);
+      setStartDateDisplay(dpy);
+      setEndDateDisplay(dpy);
       return;
     }
     setDraft(initial);
     setStartHm(toTimeString(initial.startTime));
     setEndHm(toTimeString(initial.endTime));
     setMovedDateDisplay(calendarKeyToDisplay(formatDateKey(getTaskCalendarDay(initial))));
+    setStartDateDisplay(calendarKeyToDisplay(initial.startDate.slice(0, 10)));
+    setEndDateDisplay(calendarKeyToDisplay(initial.endDate.slice(0, 10)));
   }, [visible, mode, initial, dateKey, defaultProjectId]);
 
   const readOnly = mode === 'view';
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        row: { flexDirection: 'row', gap: t.spacing.sm },
+        flex: { flex: 1 },
+        chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
+        chip: {
+          paddingHorizontal: t.spacing.sm + 4,
+          paddingVertical: t.spacing.sm,
+          borderRadius: t.radius.sm,
+          borderWidth: 1,
+          borderColor: t.colors.border,
+          backgroundColor: t.colors.surface,
+        },
+        chipActive: {
+          borderColor: t.colors.task,
+          backgroundColor: t.dark ? 'rgba(217, 119, 6, 0.22)' : '#FFFBEB',
+        },
+        chipLabel: { color: t.colors.text, fontWeight: '600', fontSize: 13 },
+        chipLabelActive: { color: t.colors.task },
+        meta: { fontSize: 13, color: t.colors.muted, marginBottom: t.spacing.sm },
+      }),
+    [t],
+  );
 
   const persist = () => {
     const dayKey =
@@ -93,39 +146,43 @@ export function TaskEditorModal({
         ? displayToCalendarKey(movedDateDisplay)
         : dateKey;
     if (draft.status === 'moved' && !dayKey) {
-      Alert.alert('Дата перенесення', 'Формат дд/мм/рррр.');
+      showThemedAlert('Дата перенесення', 'Формат дд/мм/рррр.');
       return;
     }
     const d = parseDateKey(dayKey ?? dateKey);
     const startTime = combineDateAndTime(d, startHm);
     const endTime = combineDateAndTime(d, endHm);
     if (new Date(endTime) <= new Date(startTime)) {
-      Alert.alert('Час', 'Кінець має бути після початку.');
+      showThemedAlert('Час', 'Кінець має бути після початку.');
       return;
     }
     if (!draft.title.trim()) {
-      Alert.alert('Назва', 'Вкажіть назву.');
+      showThemedAlert('Назва', 'Вкажіть назву.');
       return;
     }
     if (!draft.projectId) {
-      Alert.alert('Проєкт', 'Додайте проєкт у профілі.');
+      showThemedAlert('Проєкт', 'Додайте проєкт у профілі.');
       return;
     }
-    if (draft.status === 'moved') {
-      onSave({
-        ...draft,
-        startTime,
-        endTime,
-        movedToDate: parseDateKey(dayKey!).toISOString(),
-      });
-    } else {
-      onSave({
-        ...draft,
-        startTime,
-        endTime,
-        movedToDate: undefined,
-      });
-    }
+    const sdKey =
+      displayToCalendarKey(startDateDisplay) ?? dateKey;
+    const edKey = displayToCalendarKey(endDateDisplay) ?? dateKey;
+    const completedDateKey =
+      draft.status === 'done'
+        ? draft.completedDateKey ?? formatDateKey(new Date())
+        : undefined;
+    onSave({
+      ...draft,
+      startTime,
+      endTime,
+      startDate: sdKey,
+      endDate: edKey,
+      completedDateKey,
+      movedToDate:
+        draft.status === 'moved'
+          ? parseDateKey(dayKey!).toISOString()
+          : undefined,
+    });
     onClose();
   };
 
@@ -152,7 +209,7 @@ export function TaskEditorModal({
           variant="danger"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert('Видалити задачу?', '', [
+            showThemedAlert('Видалити задачу?', '', [
               { text: 'Скасувати', style: 'cancel' },
               {
                 text: 'Видалити',
@@ -193,6 +250,86 @@ export function TaskEditorModal({
           multiline
         />
       </FormField>
+      {draft.number > 0 ? (
+        <Text style={styles.meta}>№ {draft.number}</Text>
+      ) : null}
+      <View style={styles.row}>
+        <View style={styles.flex}>
+          <FormField label="Дата поч. (дд/мм/рррр)">
+            <TextInputField
+              value={startDateDisplay}
+              editable={!readOnly}
+              onChangeText={setStartDateDisplay}
+              keyboardType="numbers-and-punctuation"
+            />
+          </FormField>
+        </View>
+        <View style={styles.flex}>
+          <FormField label="Дата кін. (дд/мм/рррр)">
+            <TextInputField
+              value={endDateDisplay}
+              editable={!readOnly}
+              onChangeText={setEndDateDisplay}
+              keyboardType="numbers-and-punctuation"
+            />
+          </FormField>
+        </View>
+      </View>
+      <FormField label="Етап / стадія">
+        <TextInputField
+          value={draft.stage}
+          editable={!readOnly}
+          onChangeText={(t) => setDraft((x) => ({ ...x, stage: t }))}
+          placeholder="Напр. Розробка"
+        />
+      </FormField>
+      <FormField label="Пріоритет">
+        <View style={styles.chips}>
+          {PRIORITIES.map((p) => {
+            const active = draft.priority === p.key;
+            return (
+              <Pressable
+                key={p.key}
+                disabled={readOnly}
+                onPress={() => setDraft((x) => ({ ...x, priority: p.key }))}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+                  {p.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </FormField>
+      {taskTypes.length > 0 ? (
+        <FormField label="Тип задачі">
+          <View style={styles.chips}>
+            <Pressable
+              disabled={readOnly}
+              onPress={() => setDraft((x) => ({ ...x, typeId: null }))}
+              style={[styles.chip, draft.typeId == null && styles.chipActive]}
+            >
+              <Text style={styles.chipLabel}>—</Text>
+            </Pressable>
+            {taskTypes.map((tt) => {
+              const active = draft.typeId === tt.id;
+              return (
+                <Pressable
+                  key={tt.id}
+                  disabled={readOnly}
+                  onPress={() => setDraft((x) => ({ ...x, typeId: tt.id }))}
+                  style={[styles.chip, active && styles.chipActive]}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+                    {tt.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </FormField>
+      ) : null}
       {draft.status === 'moved' && !readOnly ? (
         <FormField label="Нова дата (перенесення)" hint="дд/мм/рррр">
           <TextInputField
@@ -280,24 +417,3 @@ export function TaskEditorModal({
     </AppModal>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: theme.spacing.sm },
-  flex: { flex: 1 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  chip: {
-    paddingHorizontal: theme.spacing.sm + 4,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  chipActive: {
-    borderColor: theme.colors.task,
-    backgroundColor: '#FFFBEB',
-  },
-  chipLabel: { color: theme.colors.text, fontWeight: '600', fontSize: 13 },
-  chipLabelActive: { color: theme.colors.task },
-  meta: { fontSize: 13, color: theme.colors.muted, marginBottom: theme.spacing.sm },
-});

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ExpenseCategory, ModalMode } from '../types';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
@@ -35,16 +36,18 @@ export function CategoryEditorModal({
   onDelete,
   onRequestEdit,
 }: Props) {
+  const t = useAppTheme();
   const [draft, setDraft] = useState<ExpenseCategory>({
     id: '',
     name: '',
     color: PRESET_COLORS[0],
+    archived: false,
   });
 
   useEffect(() => {
     if (!visible) return;
     if (mode === 'create' || !initial) {
-      setDraft({ id: '', name: '', color: PRESET_COLORS[0] });
+      setDraft({ id: '', name: '', color: PRESET_COLORS[0], archived: false });
       return;
     }
     setDraft(initial);
@@ -54,7 +57,7 @@ export function CategoryEditorModal({
 
   const persist = () => {
     if (!draft.name.trim()) {
-      Alert.alert('Назва', 'Вкажіть назву категорії.');
+      showThemedAlert('Назва', 'Вкажіть назву категорії.');
       return;
     }
     onSave(draft);
@@ -78,13 +81,24 @@ export function CategoryEditorModal({
           onPress={onRequestEdit}
         />
       ) : null}
+      {mode === 'view' && initial?.id ? (
+        <Button
+          title={draft.archived ? 'Відновити' : 'У архів'}
+          variant="secondary"
+          style={{ flex: 1 }}
+          onPress={() => {
+            onSave({ ...draft, archived: !draft.archived });
+            onClose();
+          }}
+        />
+      ) : null}
       {mode === 'view' && initial && onDelete ? (
         <Button
           title="Видалити"
           variant="danger"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert('Видалити категорію?', '', [
+            showThemedAlert('Видалити категорію?', '', [
               { text: 'Скасувати', style: 'cancel' },
               {
                 text: 'Видалити',
@@ -125,7 +139,7 @@ export function CategoryEditorModal({
               style={[
                 styles.swatch,
                 { backgroundColor: c },
-                draft.color === c && styles.swatchSelected,
+                draft.color === c && { borderColor: t.colors.accent, borderWidth: 3 },
               ]}
             />
           ))}
@@ -134,7 +148,7 @@ export function CategoryEditorModal({
           value={draft.color}
           editable={!readOnly}
           onChangeText={(t) => setDraft((x) => ({ ...x, color: t }))}
-          style={{ marginTop: theme.spacing.sm }}
+          style={{ marginTop: t.spacing.sm }}
         />
       </FormField>
     </AppModal>
@@ -142,7 +156,7 @@ export function CategoryEditorModal({
 }
 
 const styles = StyleSheet.create({
-  colorsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
+  colorsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   swatch: {
     width: 36,
     height: 36,
@@ -150,5 +164,4 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'transparent',
   },
-  swatchSelected: { borderColor: theme.colors.text },
 });

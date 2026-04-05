@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
+import { useAppTheme } from '../store/ThemeContext';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { format, parseISO } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { formatDisplayDate } from '../utils/dateTime';
-import { theme } from '../theme/theme';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { TransactionEditorModal } from '../components/TransactionEditorModal';
@@ -12,7 +12,8 @@ import { useProjects } from '../hooks/useProjects';
 import type { ModalMode, Transaction } from '../types';
 
 export function FinanceScreen() {
-  const { activeProjects, expenseCategories } = useProjects();
+  const t = useAppTheme();
+  const { activeProjects, activeExpenseCategories } = useProjects();
   const { transactions, addTransaction, upsertTransaction, removeTransaction } =
     useFinance();
 
@@ -31,7 +32,42 @@ export function FinanceScreen() {
   );
 
   const projectOpts = activeProjects.map((p) => ({ id: p.id, name: p.name }));
-  const catOpts = expenseCategories.map((c) => ({ id: c.id, name: c.name }));
+  const catOpts = activeExpenseCategories.map((c) => ({ id: c.id, name: c.name }));
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        screen: {
+          flex: 1,
+          backgroundColor: t.colors.background,
+          padding: t.spacing.md,
+        },
+        heading: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: t.colors.text,
+          marginBottom: t.spacing.md,
+        },
+        actions: { flexDirection: 'row', gap: t.spacing.sm, marginBottom: t.spacing.md },
+        actionBtn: { flex: 1 },
+        sub: {
+          fontSize: 15,
+          fontWeight: '700',
+          color: t.colors.muted,
+          marginBottom: t.spacing.sm,
+        },
+        list: { paddingBottom: t.spacing.xl },
+        card: { marginBottom: t.spacing.sm },
+        row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+        cardTitle: { fontSize: 16, fontWeight: '700', color: t.colors.text },
+        amount: { fontSize: 16, fontWeight: '700' },
+        income: { color: t.colors.accent },
+        expense: { color: t.colors.danger },
+        meta: { marginTop: 4, fontSize: 13, color: t.colors.muted },
+        empty: { color: t.colors.muted, textAlign: 'center', marginTop: t.spacing.lg },
+      }),
+    [t],
+  );
 
   return (
     <View style={styles.screen}>
@@ -119,25 +155,3 @@ export function FinanceScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.colors.background, padding: theme.spacing.md },
-  heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  actions: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
-  actionBtn: { flex: 1 },
-  sub: { fontSize: 15, fontWeight: '700', color: theme.colors.muted, marginBottom: theme.spacing.sm },
-  list: { paddingBottom: theme.spacing.xl },
-  card: { marginBottom: theme.spacing.sm },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  amount: { fontSize: 16, fontWeight: '700' },
-  income: { color: theme.colors.accent },
-  expense: { color: theme.colors.danger },
-  meta: { marginTop: 4, fontSize: 13, color: theme.colors.muted },
-  empty: { color: theme.colors.muted, textAlign: 'center', marginTop: theme.spacing.lg },
-});

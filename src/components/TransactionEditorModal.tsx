@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ModalMode, Transaction, TransactionType } from '../types';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import {
   formatDisplayDate,
   parseDisplayDateToStartOfDayIso,
 } from '../utils/dateTime';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
@@ -38,6 +39,7 @@ export function TransactionEditorModal({
   onDelete,
   onRequestEdit,
 }: Props) {
+  const t = useAppTheme();
   const [draft, setDraft] = useState<Transaction>({
     id: '',
     type: fixedType,
@@ -78,15 +80,37 @@ export function TransactionEditorModal({
 
   const readOnly = mode === 'view';
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
+        chip: {
+          paddingHorizontal: t.spacing.sm + 4,
+          paddingVertical: t.spacing.sm,
+          borderRadius: t.radius.sm,
+          borderWidth: 1,
+          borderColor: t.colors.border,
+          backgroundColor: t.colors.surface,
+        },
+        chipActive: {
+          borderColor: t.colors.accent,
+          backgroundColor: t.dark ? 'rgba(96, 165, 250, 0.15)' : '#EFF6FF',
+        },
+        chipLabel: { color: t.colors.text, fontWeight: '600', fontSize: 13 },
+        chipLabelActive: { color: t.colors.accent },
+      }),
+    [t],
+  );
+
   const persist = () => {
     const n = parseFloat(amountStr.replace(',', '.'));
     if (!Number.isFinite(n) || n <= 0) {
-      Alert.alert('Сума', 'Вкажіть коректну суму.');
+      showThemedAlert('Сума', 'Вкажіть коректну суму.');
       return;
     }
     const dateParsed = parseDisplayDateToStartOfDayIso(dateDisplay);
     if (!dateParsed) {
-      Alert.alert('Дата', 'Формат дд/мм/рррр (наприклад 03/04/2026).');
+      showThemedAlert('Дата', 'Формат дд/мм/рррр (наприклад 03/04/2026).');
       return;
     }
     const date = dateParsed;
@@ -95,7 +119,7 @@ export function TransactionEditorModal({
       const isOther = incomeTarget === 'other';
       const details = draft.details.trim();
       if (isOther && !details) {
-        Alert.alert('Деталі', 'Для «Інше» заповніть деталі.');
+        showThemedAlert('Деталі', 'Для «Інше» заповніть деталі.');
         return;
       }
       onSave({
@@ -109,7 +133,7 @@ export function TransactionEditorModal({
       });
     } else {
       if (!draft.categoryId) {
-        Alert.alert('Категорія', 'Оберіть категорію у профілі або додайте її.');
+        showThemedAlert('Категорія', 'Оберіть категорію у профілі або додайте її.');
         return;
       }
       onSave({
@@ -152,7 +176,7 @@ export function TransactionEditorModal({
           variant="danger"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert('Видалити запис?', '', [
+            showThemedAlert('Видалити запис?', '', [
               { text: 'Скасувати', style: 'cancel' },
               {
                 text: 'Видалити',
@@ -288,21 +312,3 @@ export function TransactionEditorModal({
     </AppModal>
   );
 }
-
-const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  chip: {
-    paddingHorizontal: theme.spacing.sm + 4,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  chipActive: {
-    borderColor: theme.colors.accent,
-    backgroundColor: '#EFF6FF',
-  },
-  chipLabel: { color: theme.colors.text, fontWeight: '600', fontSize: 13 },
-  chipLabelActive: { color: theme.colors.accent },
-});

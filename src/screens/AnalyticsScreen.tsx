@@ -8,14 +8,9 @@ import {
   View,
 } from 'react-native';
 import { PieChart } from 'react-native-chart-kit';
-import {
-  addMonths,
-  format,
-  parseISO,
-  startOfMonth,
-} from 'date-fns';
+import { addMonths, format, parseISO, startOfMonth } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { SegmentControl } from '../components/SegmentControl';
 import { useFinance } from '../hooks/useFinance';
 import { useProjects } from '../hooks/useProjects';
@@ -32,6 +27,7 @@ function monthKey(iso: string): string {
 }
 
 export function AnalyticsScreen() {
+  const t = useAppTheme();
   const { tasks } = useTasks();
   const { transactions } = useFinance();
   const { projects, expenseCategories } = useProjects();
@@ -45,15 +41,15 @@ export function AnalyticsScreen() {
   const filteredTx = useMemo(
     () =>
       transactions.filter(
-        (t) => t.type === finKind && monthKey(t.date) === selKey,
+        (tx) => tx.type === finKind && monthKey(tx.date) === selKey,
       ),
     [transactions, finKind, selKey],
   );
 
   const taskChartData = useMemo(() => {
     const map = new Map<string, number>();
-    for (const t of tasks) {
-      map.set(t.projectId, (map.get(t.projectId) ?? 0) + 1);
+    for (const tk of tasks) {
+      map.set(tk.projectId, (map.get(tk.projectId) ?? 0) + 1);
     }
     return [...map.entries()]
       .filter(([, n]) => n > 0)
@@ -62,26 +58,26 @@ export function AnalyticsScreen() {
         return {
           name: p?.name ?? projectId,
           population,
-          color: p?.color ?? theme.colors.muted,
-          legendFontColor: theme.colors.text,
+          color: p?.color ?? t.colors.muted,
+          legendFontColor: t.colors.text,
           legendFontSize: 12,
         };
       });
-  }, [tasks, projects]);
+  }, [tasks, projects, t.colors.muted, t.colors.text]);
 
   const financeChartData = useMemo(() => {
     if (finKind === 'income') {
       const map = new Map<string, { amount: number; color: string }>();
-      for (const t of filteredTx) {
-        const key = t.projectId
-          ? (projects.find((p) => p.id === t.projectId)?.name ?? 'Проєкт')
+      for (const tx of filteredTx) {
+        const key = tx.projectId
+          ? (projects.find((p) => p.id === tx.projectId)?.name ?? 'Проєкт')
           : 'Інше';
-        const color = t.projectId
-          ? projects.find((p) => p.id === t.projectId)?.color ?? theme.colors.accent
-          : theme.colors.muted;
+        const color = tx.projectId
+          ? projects.find((p) => p.id === tx.projectId)?.color ?? t.colors.accent
+          : t.colors.muted;
         const prev = map.get(key);
         map.set(key, {
-          amount: (prev?.amount ?? 0) + t.amount,
+          amount: (prev?.amount ?? 0) + tx.amount,
           color: prev?.color ?? color,
         });
       }
@@ -89,18 +85,18 @@ export function AnalyticsScreen() {
         name: `${name} (${amount.toFixed(2)})`,
         population: Math.max(amount, 0.01),
         color,
-        legendFontColor: theme.colors.text,
+        legendFontColor: t.colors.text,
         legendFontSize: 12,
       }));
     }
     const map = new Map<string, { amount: number; color: string }>();
-    for (const t of filteredTx) {
-      const c = expenseCategories.find((x) => x.id === t.categoryId);
+    for (const tx of filteredTx) {
+      const c = expenseCategories.find((x) => x.id === tx.categoryId);
       const key = c?.name ?? 'Без категорії';
-      const color = c?.color ?? theme.colors.danger;
+      const color = c?.color ?? t.colors.danger;
       const prev = map.get(key);
       map.set(key, {
-        amount: (prev?.amount ?? 0) + t.amount,
+        amount: (prev?.amount ?? 0) + tx.amount,
         color: prev?.color ?? color,
       });
     }
@@ -108,12 +104,50 @@ export function AnalyticsScreen() {
       name: `${name} (${amount.toFixed(2)})`,
       population: Math.max(amount, 0.01),
       color,
-      legendFontColor: theme.colors.text,
+      legendFontColor: t.colors.text,
       legendFontSize: 12,
     }));
-  }, [filteredTx, finKind, projects, expenseCategories]);
+  }, [filteredTx, finKind, projects, expenseCategories, t.colors]);
 
-  const w = Dimensions.get('window').width - theme.spacing.md * 2;
+  const w = Dimensions.get('window').width - t.spacing.md * 2;
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        screen: { flex: 1, backgroundColor: t.colors.background },
+        content: { padding: t.spacing.md, paddingBottom: t.spacing.xl * 2 },
+        heading: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: t.colors.text,
+          marginBottom: t.spacing.md,
+        },
+        sub: {
+          marginTop: t.spacing.lg,
+          marginBottom: t.spacing.sm,
+          fontSize: 15,
+          fontWeight: '700',
+          color: t.colors.muted,
+        },
+        empty: { color: t.colors.muted, marginTop: t.spacing.md },
+        monthRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginTop: t.spacing.lg,
+          marginBottom: t.spacing.md,
+        },
+        nav: { padding: t.spacing.sm, minWidth: 40, alignItems: 'center' },
+        navTxt: { fontSize: 24, color: t.colors.accent },
+        monthTitle: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: t.colors.text,
+          textTransform: 'capitalize',
+        },
+      }),
+    [t],
+  );
 
   return (
     <ScrollView
@@ -142,7 +176,7 @@ export function AnalyticsScreen() {
               width={w}
               height={220}
               chartConfig={{
-                color: () => theme.colors.text,
+                color: () => t.colors.text,
               }}
               accessor="population"
               backgroundColor="transparent"
@@ -184,7 +218,7 @@ export function AnalyticsScreen() {
               width={w}
               height={240}
               chartConfig={{
-                color: () => theme.colors.text,
+                color: () => t.colors.text,
               }}
               accessor="population"
               backgroundColor="transparent"
@@ -197,37 +231,3 @@ export function AnalyticsScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
-  content: { padding: theme.spacing.md, paddingBottom: theme.spacing.xl * 2 },
-  heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  sub: {
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.muted,
-  },
-  empty: { color: theme.colors.muted, marginTop: theme.spacing.md },
-  monthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  nav: { padding: theme.spacing.sm, minWidth: 40, alignItems: 'center' },
-  navTxt: { fontSize: 24, color: theme.colors.accent },
-  monthTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.text,
-    textTransform: 'capitalize',
-  },
-});

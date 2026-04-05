@@ -1,47 +1,145 @@
-import React, { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../theme/theme';
+import type { AppTheme } from '../theme/palette';
+import { useAppTheme, useThemeControls } from '../store/ThemeContext';
+import { useAppData } from '../store/AppDataContext';
 import { Card } from '../components/Card';
 import { CategoryEditorModal } from '../components/CategoryEditorModal';
+import { ChallengeEditorModal } from '../components/ChallengeEditorModal';
 import { CompleteProjectModal } from '../components/CompleteProjectModal';
 import { FAB } from '../components/FAB';
 import { ProjectEditorModal } from '../components/ProjectEditorModal';
+import { TaskTypeEditorModal } from '../components/TaskTypeEditorModal';
+import { AppModal } from '../components/AppModal';
+import { Button } from '../components/Button';
 import { useProjects } from '../hooks/useProjects';
-import type { ExpenseCategory, ModalMode, Project } from '../types';
+import type { ProfileStackParamList } from '../navigation/types';
+import type { Challenge, ExpenseCategory, ModalMode, Project, TaskType } from '../types';
+import { createId } from '../utils/id';
 import { formatDisplayDate } from '../utils/dateTime';
 import { formatTenure } from '../utils/tenure';
+import { levelFromTotalXp } from '../utils/levels';
 
 type Editor =
   | { kind: 'project'; mode: ModalMode; id?: string }
   | { kind: 'category'; mode: ModalMode; id?: string }
+  | { kind: 'taskType'; mode: ModalMode; id?: string }
+  | { kind: 'challenge'; mode: ModalMode; id?: string }
   | null;
 
+function makeStyles(t: AppTheme) {
+  return StyleSheet.create({
+    wrap: { flex: 1, backgroundColor: t.colors.background },
+    screen: { flex: 1, padding: t.spacing.md },
+    heading: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: t.colors.text,
+      marginBottom: t.spacing.md,
+    },
+    section: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: t.colors.muted,
+      marginBottom: t.spacing.sm,
+    },
+    mt: { marginTop: t.spacing.lg },
+    card: { marginBottom: t.spacing.sm },
+    row: { flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm },
+    flex: { flex: 1 },
+    swatch: { width: 12, height: 40, borderRadius: 6 },
+    cardTitle: { fontSize: 16, fontWeight: '700', color: t.colors.text },
+    meta: { marginTop: 4, fontSize: 13, color: t.colors.muted },
+    empty: { color: t.colors.muted, marginBottom: t.spacing.sm },
+    levelBox: { marginBottom: t.spacing.md },
+    levelTitle: { fontSize: 18, fontWeight: '800', color: t.colors.text },
+    track: {
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: t.colors.border,
+      marginTop: t.spacing.sm,
+      overflow: 'hidden',
+    },
+    fill: { height: '100%', borderRadius: 5, backgroundColor: t.colors.accent },
+    levelSub: { marginTop: 6, fontSize: 13, color: t.colors.muted },
+    settingsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: t.spacing.sm,
+      gap: t.spacing.sm,
+    },
+    settingsLabel: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: t.colors.muted,
+      flex: 1,
+    },
+    settingsLink: { fontSize: 14, fontWeight: '600', color: t.colors.accent },
+    settingsChevron: { fontSize: 20, color: t.colors.muted, lineHeight: 22 },
+    settingsRowEnd: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    modalHint: { fontSize: 15, lineHeight: 22, color: t.colors.muted },
+    fabMenuStack: { gap: t.spacing.sm, width: '100%', alignSelf: 'stretch' },
+    clearActions: { width: '100%', gap: t.spacing.sm, alignSelf: 'stretch' },
+  });
+}
+
 export function ProfileScreen() {
+  const t = useAppTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>>();
+  const { toggleTheme, dark, setDark } = useThemeControls();
+  const {
+    focusSessions,
+    achievementsState,
+    challengesState,
+    upsertChallenge,
+    removeChallenge,
+    clearAllUserData,
+  } = useAppData();
   const {
     projects,
     expenseCategories,
+    taskTypes,
     addProject,
     upsertProject,
     removeProject,
     addExpenseCategory,
     upsertExpenseCategory,
     removeExpenseCategory,
+    addTaskType,
+    upsertTaskType,
+    removeTaskType,
   } = useProjects();
 
   const [editor, setEditor] = useState<Editor>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [addMenuVisible, setAddMenuVisible] = useState(false);
+  const [clearConfirmVisible, setClearConfirmVisible] = useState(false);
 
-  const activeProjects = projects.filter((p) => !p.archived);
-  const archivedProjects = projects.filter((p) => p.archived);
+  const activeProjects = useMemo(() => projects.filter((p) => !p.archived), [projects]);
+  const archivedProjects = useMemo(() => projects.filter((p) => p.archived), [projects]);
+  const archivedTaskTypes = useMemo(() => taskTypes.filter((x) => x.archived), [taskTypes]);
+  const archivedCategories = useMemo(
+    () => expenseCategories.filter((c) => c.archived),
+    [expenseCategories],
+  );
+  const archivedChallenges = useMemo(
+    () => challengesState.challenges.filter((c) => c.archived),
+    [challengesState.challenges],
+  );
+  const projectOptions = useMemo(
+    () => activeProjects.map((p) => ({ id: p.id, name: p.name })),
+    [activeProjects],
+  );
+
+  const totalXp = focusSessions.reduce((a, s) => a + s.xpEarned, 0);
+  const L = levelFromTotalXp(totalXp);
+  const progress = L.xpForNext > 0 ? L.xpIntoLevel / L.xpForNext : 1;
 
   const selectedProject =
     editor?.kind === 'project' && editor.id
@@ -53,19 +151,25 @@ export function ProfileScreen() {
       ? expenseCategories.find((c) => c.id === editor.id)
       : null;
 
+  const selectedTaskType =
+    editor?.kind === 'taskType' && editor.id
+      ? taskTypes.find((x) => x.id === editor.id)
+      : null;
+
+  const selectedChallenge =
+    editor?.kind === 'challenge' && editor.id
+      ? challengesState.challenges.find((c) => c.id === editor.id)
+      : null;
+
   const completingProject = completingId
     ? projects.find((p) => p.id === completingId)
     : null;
 
-  const openFab = () => {
-    Alert.alert('Додати', undefined, [
-      { text: 'Проєкт', onPress: () => setEditor({ kind: 'project', mode: 'create' }) },
-      {
-        text: 'Категорія витрат',
-        onPress: () => setEditor({ kind: 'category', mode: 'create' }),
-      },
-      { text: 'Скасувати', style: 'cancel' },
-    ]);
+  const openFab = () => setAddMenuVisible(true);
+
+  const pickAddKind = (next: Editor) => {
+    setAddMenuVisible(false);
+    setEditor(next);
   };
 
   const saveProject = (p: Project) => {
@@ -86,6 +190,23 @@ export function ProfileScreen() {
     void upsertExpenseCategory(c);
   };
 
+  const saveTaskType = (x: TaskType) => {
+    if (!x.id) {
+      const { id: _i, ...rest } = x;
+      void addTaskType(rest);
+      return;
+    }
+    void upsertTaskType(x);
+  };
+
+  const saveChallenge = (c: Challenge) => {
+    if (!c.id) {
+      void upsertChallenge({ ...c, id: createId() });
+      return;
+    }
+    void upsertChallenge(c);
+  };
+
   return (
     <View style={styles.wrap}>
       <ScrollView
@@ -94,7 +215,36 @@ export function ProfileScreen() {
       >
         <Text style={styles.heading}>Профіль</Text>
 
-        <Text style={styles.section}>Активні проєкти</Text>
+        <View style={styles.levelBox}>
+          <Text style={styles.levelTitle}>
+            Рівень {L.level} · {Math.round(totalXp)} XP
+          </Text>
+          <View style={styles.track}>
+            <View style={[styles.fill, { width: `${Math.round(progress * 100)}%` }]} />
+          </View>
+          <Text style={styles.levelSub}>
+            До рівня {L.level + 1}: {L.xpIntoLevel} / {L.xpForNext} XP · серія:{' '}
+            {achievementsState.globalStreak?.current ?? 0} дн.
+          </Text>
+          <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+            <Button title="Рівні за проєктами" onPress={() => navigation.navigate('ProjectLevels')} />
+            <Button
+              title={dark ? 'Світла тема' : 'Темна тема'}
+              variant="secondary"
+              onPress={() => toggleTheme()}
+            />
+          </View>
+        </View>
+
+        <View style={styles.settingsRow}>
+          <Text style={styles.settingsLabel}>Активні проєкти</Text>
+          <Pressable onPress={() => navigation.navigate('ArchivedProjects')} hitSlop={8}>
+            <Text style={styles.settingsLink}>
+              Архів
+              {archivedProjects.length > 0 ? ` (${archivedProjects.length})` : ''}
+            </Text>
+          </Pressable>
+        </View>
         {activeProjects.length === 0 ? (
           <Text style={styles.empty}>Ще немає активних проєктів</Text>
         ) : null}
@@ -121,56 +271,174 @@ export function ProfileScreen() {
           </Pressable>
         ))}
 
-        <Text style={[styles.section, styles.mt]}>Архів</Text>
-        {archivedProjects.length === 0 ? (
-          <Text style={styles.empty}>Завершені проєкти з’являться тут</Text>
-        ) : null}
-        {archivedProjects.map((p) => (
+        <View style={[styles.settingsRow, styles.mt]}>
           <Pressable
-            key={p.id}
-            onPress={() => setEditor({ kind: 'project', mode: 'view', id: p.id })}
+            style={styles.flex}
+            onPress={() => navigation.navigate('TaskTypesSettings')}
           >
-            <Card style={styles.card}>
-              <View style={styles.row}>
-                <View style={[styles.swatch, { backgroundColor: p.color }]} />
-                <View style={styles.flex}>
-                  <Text style={styles.cardTitle}>{p.name}</Text>
-                  <Text style={styles.meta}>
-                    {p.endDate
-                      ? `Завершено: ${formatDisplayDate(p.endDate)}`
-                      : 'Архів'}
-                  </Text>
-                  <Text style={styles.meta}>
-                    Тривалість: {formatTenure(p.startDate, p.endDate)}
-                  </Text>
-                </View>
-              </View>
-            </Card>
+            <Text style={styles.settingsLabel}>Типи задач</Text>
           </Pressable>
-        ))}
+          <View style={styles.settingsRowEnd}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('TaskTypesSettings', { showArchived: true })
+              }
+              hitSlop={8}
+            >
+              <Text style={styles.settingsLink}>
+                Архів
+                {archivedTaskTypes.length > 0 ? ` (${archivedTaskTypes.length})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('TaskTypesSettings')}
+              hitSlop={10}
+            >
+              <Text style={styles.settingsChevron}>›</Text>
+            </Pressable>
+          </View>
+        </View>
 
-        <Text style={[styles.section, styles.mt]}>Категорії витрат</Text>
-        {expenseCategories.length === 0 ? (
-          <Text style={styles.empty}>Додайте категорії для обліку витрат</Text>
-        ) : null}
-        {expenseCategories.map((c) => (
+        <View style={[styles.settingsRow, styles.mt]}>
           <Pressable
-            key={c.id}
-            onPress={() =>
-              setEditor({ kind: 'category', mode: 'view', id: c.id })
-            }
+            style={styles.flex}
+            onPress={() => navigation.navigate('ChallengesSettings')}
           >
-            <Card style={styles.card}>
-              <View style={styles.row}>
-                <View style={[styles.swatch, { backgroundColor: c.color }]} />
-                <Text style={styles.cardTitle}>{c.name}</Text>
-              </View>
-            </Card>
+            <Text style={styles.settingsLabel}>Челенджі</Text>
           </Pressable>
-        ))}
+          <View style={styles.settingsRowEnd}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('ChallengesSettings', { showArchived: true })
+              }
+              hitSlop={8}
+            >
+              <Text style={styles.settingsLink}>
+                Архів
+                {archivedChallenges.length > 0 ? ` (${archivedChallenges.length})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('ChallengesSettings')}
+              hitSlop={10}
+            >
+              <Text style={styles.settingsChevron}>›</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={[styles.settingsRow, styles.mt]}>
+          <Pressable
+            style={styles.flex}
+            onPress={() => navigation.navigate('ExpenseCategoriesSettings')}
+          >
+            <Text style={styles.settingsLabel}>Категорії витрат</Text>
+          </Pressable>
+          <View style={styles.settingsRowEnd}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('ExpenseCategoriesSettings', {
+                  showArchived: true,
+                })
+              }
+              hitSlop={8}
+            >
+              <Text style={styles.settingsLink}>
+                Архів
+                {archivedCategories.length > 0 ? ` (${archivedCategories.length})` : ''}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.navigate('ExpenseCategoriesSettings')}
+              hitSlop={10}
+            >
+              <Text style={styles.settingsChevron}>›</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <Text style={[styles.section, styles.mt]}>Дані на пристрої</Text>
+        <Card style={styles.card}>
+          <Text style={styles.meta}>
+            Повне очищення: профіль, події, задачі, нотатки, фінанси, челенджі тощо. Дію не можна
+            скасувати.
+          </Text>
+          <View style={{ marginTop: t.spacing.sm }}>
+            <Button
+              title="Очистити всі дані"
+              variant="danger"
+              onPress={() => setClearConfirmVisible(true)}
+            />
+          </View>
+        </Card>
       </ScrollView>
 
       <FAB onPress={openFab} />
+
+      <AppModal
+        visible={addMenuVisible}
+        title="Додати"
+        onClose={() => setAddMenuVisible(false)}
+      >
+        <View style={styles.fabMenuStack}>
+          <Button
+            title="Проєкт"
+            variant="secondary"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => pickAddKind({ kind: 'project', mode: 'create' })}
+          />
+          <Button
+            title="Категорія витрат"
+            variant="secondary"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => pickAddKind({ kind: 'category', mode: 'create' })}
+          />
+          <Button
+            title="Тип задачі"
+            variant="secondary"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => pickAddKind({ kind: 'taskType', mode: 'create' })}
+          />
+          <Button
+            title="Челендж"
+            variant="secondary"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => pickAddKind({ kind: 'challenge', mode: 'create' })}
+          />
+        </View>
+      </AppModal>
+
+      <AppModal
+        visible={clearConfirmVisible}
+        title="Очистити всі дані?"
+        onClose={() => setClearConfirmVisible(false)}
+        footer={
+          <View style={styles.clearActions}>
+            <Button
+              title="Скасувати"
+              variant="secondary"
+              style={{ alignSelf: 'stretch' }}
+              onPress={() => setClearConfirmVisible(false)}
+            />
+            <Button
+              title="Очистити"
+              variant="danger"
+              style={{ alignSelf: 'stretch' }}
+              onPress={() => {
+                void (async () => {
+                  await clearAllUserData();
+                  setDark(false);
+                  setClearConfirmVisible(false);
+                })();
+              }}
+            />
+          </View>
+        }
+      >
+        <Text style={styles.modalHint}>
+          Усі локальні дані буде видалено. Цю дію не можна скасувати.
+        </Text>
+      </AppModal>
 
       <ProjectEditorModal
         visible={editor?.kind === 'project'}
@@ -230,31 +498,35 @@ export function ProfileScreen() {
         onSave={saveCategory}
         onDelete={(id) => void removeExpenseCategory(id)}
       />
+
+      <TaskTypeEditorModal
+        visible={editor?.kind === 'taskType'}
+        mode={editor?.kind === 'taskType' ? editor.mode : 'create'}
+        initial={selectedTaskType ?? null}
+        onClose={() => setEditor(null)}
+        onRequestEdit={() =>
+          editor?.kind === 'taskType' && editor.id
+            ? setEditor({ kind: 'taskType', mode: 'edit', id: editor.id })
+            : undefined
+        }
+        onSave={saveTaskType}
+        onDelete={(id) => void removeTaskType(id)}
+      />
+
+      <ChallengeEditorModal
+        visible={editor?.kind === 'challenge'}
+        mode={editor?.kind === 'challenge' ? editor.mode : 'create'}
+        initial={selectedChallenge ?? null}
+        projectIds={projectOptions}
+        onClose={() => setEditor(null)}
+        onRequestEdit={() =>
+          editor?.kind === 'challenge' && editor.id
+            ? setEditor({ kind: 'challenge', mode: 'edit', id: editor.id })
+            : undefined
+        }
+        onSave={saveChallenge}
+        onDelete={(id) => void removeChallenge(id)}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: theme.colors.background },
-  screen: { flex: 1, padding: theme.spacing.md },
-  heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  section: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: theme.colors.muted,
-    marginBottom: theme.spacing.sm,
-  },
-  mt: { marginTop: theme.spacing.lg },
-  card: { marginBottom: theme.spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  flex: { flex: 1 },
-  swatch: { width: 12, height: 40, borderRadius: 6 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  meta: { marginTop: 4, fontSize: 13, color: theme.colors.muted },
-  empty: { color: theme.colors.muted, marginBottom: theme.spacing.sm },
-});

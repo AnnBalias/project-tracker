@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 
 type Props = {
   label: string;
@@ -9,26 +9,35 @@ type Props = {
 };
 
 export function FormField({ label, children, hint }: Props) {
+  const t = useAppTheme();
   return (
-    <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.wrap, { marginBottom: t.spacing.md }]}>
+      <Text
+        style={[
+          styles.label,
+          { color: t.colors.muted, marginBottom: t.spacing.xs },
+        ]}
+      >
+        {label}
+      </Text>
       {children}
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {hint ? (
+        <Text style={[styles.hint, { marginTop: t.spacing.xs, color: t.colors.muted }]}>
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginBottom: theme.spacing.md },
+  wrap: {},
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
+    letterSpacing: 0.2,
   },
   hint: {
-    marginTop: theme.spacing.xs,
     fontSize: 12,
-    color: theme.colors.muted,
   },
 });

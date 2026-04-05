@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CalendarEvent, ModalMode, WeekdayShort } from '../types';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { WEEKDAY_OPTIONS } from '../constants/weekdays';
 import { combineDateAndTime, parseDateKey, toTimeString } from '../utils/dateTime';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
@@ -46,6 +47,7 @@ export function EventEditorModal({
   onDelete,
   onRequestEdit,
 }: Props) {
+  const t = useAppTheme();
   const defaultProjectId = projectIds[0]?.id ?? '';
   const [draft, setDraft] = useState<CalendarEvent>(() =>
     emptyFromDate(dateKey, defaultProjectId),
@@ -72,6 +74,45 @@ export function EventEditorModal({
 
   const readOnly = mode === 'view';
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        row: { flexDirection: 'row', gap: t.spacing.sm },
+        flex: { flex: 1 },
+        chips: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
+        chip: {
+          paddingHorizontal: t.spacing.sm + 4,
+          paddingVertical: t.spacing.sm,
+          borderRadius: t.radius.sm,
+          borderWidth: 1,
+          borderColor: t.colors.border,
+          backgroundColor: t.colors.surface,
+        },
+        chipActive: {
+          borderColor: t.colors.accent,
+          backgroundColor: t.dark ? 'rgba(96, 165, 250, 0.15)' : '#EFF6FF',
+        },
+        chipLabel: { color: t.colors.text, fontWeight: '600', fontSize: 14 },
+        chipLabelActive: { color: t.colors.accent },
+        daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.xs },
+        dayChip: {
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          borderRadius: t.radius.sm,
+          borderWidth: 1,
+          borderColor: t.colors.border,
+          backgroundColor: t.colors.surface,
+        },
+        dayChipOn: {
+          borderColor: t.colors.accent,
+          backgroundColor: t.dark ? 'rgba(96, 165, 250, 0.15)' : '#EFF6FF',
+        },
+        dayLabel: { fontSize: 13, color: t.colors.muted, fontWeight: '600' },
+        dayLabelOn: { color: t.colors.accent },
+      }),
+    [t],
+  );
+
   const toggleDay = (k: WeekdayShort) => {
     if (readOnly) return;
     setSelectedDays((prev) => {
@@ -87,15 +128,15 @@ export function EventEditorModal({
     const startTime = combineDateAndTime(d, startHm);
     const endTime = combineDateAndTime(d, endHm);
     if (new Date(endTime) <= new Date(startTime)) {
-      Alert.alert('Час', 'Кінець має бути після початку.');
+      showThemedAlert('Час', 'Кінець має бути після початку.');
       return;
     }
     if (!draft.title.trim()) {
-      Alert.alert('Назва', 'Вкажіть назву.');
+      showThemedAlert('Назва', 'Вкажіть назву.');
       return;
     }
     if (!draft.projectId) {
-      Alert.alert('Проєкт', 'Оберіть проєкт у профілі.');
+      showThemedAlert('Проєкт', 'Оберіть проєкт у профілі.');
       return;
     }
     const repeat = selectedDays.size ? Array.from(selectedDays) : undefined;
@@ -131,7 +172,7 @@ export function EventEditorModal({
           variant="danger"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert('Видалити подію?', '', [
+            showThemedAlert('Видалити подію?', '', [
               { text: 'Скасувати', style: 'cancel' },
               {
                 text: 'Видалити',
@@ -227,38 +268,3 @@ export function EventEditorModal({
     </AppModal>
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: theme.spacing.sm },
-  flex: { flex: 1 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  chip: {
-    paddingHorizontal: theme.spacing.sm + 4,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  chipActive: {
-    borderColor: theme.colors.accent,
-    backgroundColor: '#EFF6FF',
-  },
-  chipLabel: { color: theme.colors.text, fontWeight: '600', fontSize: 14 },
-  chipLabelActive: { color: theme.colors.accent },
-  daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.xs },
-  dayChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.background,
-  },
-  dayChipOn: {
-    borderColor: theme.colors.accent,
-    backgroundColor: '#EFF6FF',
-  },
-  dayLabel: { fontSize: 13, color: theme.colors.muted, fontWeight: '600' },
-  dayLabelOn: { color: theme.colors.accent },
-});

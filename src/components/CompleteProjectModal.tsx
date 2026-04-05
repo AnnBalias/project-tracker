@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text } from 'react-native';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { formatDisplayDate, parseDisplayDateToStartOfDayIso } from '../utils/dateTime';
 
 type Props = {
@@ -21,7 +22,26 @@ export function CompleteProjectModal({
   onClose,
   onConfirm,
 }: Props) {
+  const t = useAppTheme();
   const [display, setDisplay] = useState(() => formatDisplayDate(new Date()));
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        name: {
+          fontSize: 16,
+          fontWeight: '700',
+          color: t.colors.text,
+          marginBottom: t.spacing.md,
+        },
+        note: {
+          fontSize: 13,
+          color: t.colors.muted,
+          lineHeight: 18,
+        },
+      }),
+    [t],
+  );
 
   useEffect(() => {
     if (visible) setDisplay(formatDisplayDate(new Date()));
@@ -30,7 +50,7 @@ export function CompleteProjectModal({
   const submit = () => {
     const iso = parseDisplayDateToStartOfDayIso(display);
     if (!iso) {
-      Alert.alert('Дата', 'Формат дд/мм/рррр (наприклад 03/04/2026).');
+      showThemedAlert('Дата', 'Формат дд/мм/рррр (наприклад 03/04/2026).');
       return;
     }
     onConfirm(iso);
@@ -67,17 +87,3 @@ export function CompleteProjectModal({
     </AppModal>
   );
 }
-
-const styles = StyleSheet.create({
-  name: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  note: {
-    fontSize: 13,
-    color: theme.colors.muted,
-    lineHeight: 18,
-  },
-});

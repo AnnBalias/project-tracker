@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 
 export type SegmentItem<T extends string> = { key: T; label: string };
 
@@ -15,6 +15,38 @@ export function SegmentControl<T extends string>({
   value,
   onChange,
 }: Props<T>) {
+  const t = useAppTheme();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        row: {
+          flexDirection: 'row',
+          backgroundColor: t.colors.border,
+          borderRadius: t.radius.sm,
+          padding: 2,
+          gap: 2,
+        },
+        segment: {
+          flex: 1,
+          paddingVertical: t.spacing.sm,
+          alignItems: 'center',
+          borderRadius: t.radius.sm - 2,
+        },
+        segmentActive: {
+          backgroundColor: t.colors.card,
+        },
+        label: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: t.colors.muted,
+        },
+        labelActive: {
+          color: t.colors.text,
+        },
+      }),
+    [t],
+  );
+
   return (
     <View style={styles.row}>
       {items.map((item) => {
@@ -34,30 +66,3 @@ export function SegmentControl<T extends string>({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.border,
-    borderRadius: theme.radius.sm,
-    padding: 2,
-    gap: 2,
-  },
-  segment: {
-    flex: 1,
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-    borderRadius: theme.radius.sm - 2,
-  },
-  segmentActive: {
-    backgroundColor: theme.colors.card,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.muted,
-  },
-  labelActive: {
-    color: theme.colors.text,
-  },
-});

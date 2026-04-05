@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -25,6 +25,7 @@ export function Button({
   variant = 'primary',
   style,
 }: Props) {
+  const t = useAppTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -32,10 +33,19 @@ export function Button({
       disabled={disabled}
       style={({ pressed }) => [
         styles.base,
-        variant === 'primary' && styles.primary,
-        variant === 'secondary' && styles.secondary,
-        variant === 'danger' && styles.danger,
-        variant === 'ghost' && styles.ghost,
+        {
+          borderRadius: t.radius.sm,
+          paddingVertical: t.spacing.sm,
+          paddingHorizontal: t.spacing.md,
+        },
+        variant === 'primary' && { backgroundColor: t.colors.accent },
+        variant === 'secondary' && {
+          backgroundColor: t.colors.card,
+          borderWidth: 1,
+          borderColor: t.colors.border,
+        },
+        variant === 'danger' && { backgroundColor: t.colors.danger },
+        variant === 'ghost' && { backgroundColor: 'transparent' },
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
         style,
@@ -45,10 +55,10 @@ export function Button({
         style={[
           styles.label,
           variant === 'primary' && styles.labelOnPrimary,
-          variant === 'secondary' && styles.labelSecondary,
+          variant === 'secondary' && { color: t.colors.text },
           variant === 'danger' && styles.labelOnPrimary,
-          variant === 'ghost' && styles.labelGhost,
-          disabled && styles.labelDisabled,
+          variant === 'ghost' && { color: t.colors.accent },
+          disabled && { color: t.colors.muted },
         ]}
       >
         {title}
@@ -59,25 +69,11 @@ export function Button({
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: theme.spacing.sm + 2,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primary: { backgroundColor: theme.colors.accent },
-  secondary: {
-    backgroundColor: theme.colors.card,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  danger: { backgroundColor: theme.colors.danger },
-  ghost: { backgroundColor: 'transparent' },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: 0.88 },
   disabled: { opacity: 0.45 },
-  label: { fontSize: 16, fontWeight: '600' },
+  label: { fontSize: 15, fontWeight: '600', letterSpacing: 0.2 },
   labelOnPrimary: { color: '#FFFFFF' },
-  labelSecondary: { color: theme.colors.text },
-  labelGhost: { color: theme.colors.accent },
-  labelDisabled: { color: theme.colors.muted },
 });

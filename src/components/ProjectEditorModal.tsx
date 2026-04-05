@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ModalMode, Project } from '../types';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { AppModal } from './AppModal';
+import { showThemedAlert } from './themedAlert';
 import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
@@ -45,6 +46,7 @@ export function ProjectEditorModal({
   onRequestComplete,
   onRestoreFromArchive,
 }: Props) {
+  const t = useAppTheme();
   const [draft, setDraft] = useState<Project>({
     id: '',
     name: '',
@@ -75,18 +77,42 @@ export function ProjectEditorModal({
 
   const readOnly = mode === 'view';
 
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        badge: {
+          backgroundColor: t.dark ? t.colors.border : '#E5E7EB',
+          padding: t.spacing.sm,
+          borderRadius: t.radius.sm,
+          marginBottom: t.spacing.md,
+        },
+        badgeText: { fontWeight: '700', color: t.colors.text },
+        badgeSub: { marginTop: 4, fontSize: 13, color: t.colors.muted },
+        colorsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: t.spacing.sm },
+        swatch: {
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          borderWidth: 2,
+          borderColor: 'transparent',
+        },
+        swatchSelected: { borderColor: t.colors.text },
+      }),
+    [t],
+  );
+
   const persist = () => {
     if (!draft.name.trim()) {
-      Alert.alert('Назва', 'Вкажіть назву проєкту.');
+      showThemedAlert('Назва', 'Вкажіть назву проєкту.');
       return;
     }
     if (!draft.color.trim()) {
-      Alert.alert('Колір', 'Оберіть або введіть колір.');
+      showThemedAlert('Колір', 'Оберіть або введіть колір.');
       return;
     }
     const startIso = parseFlexibleStartDateToIso(startDisplay);
     if (!startIso) {
-      Alert.alert('Дата початку', 'Формат дд/мм/рррр (наприклад 15/01/2026).');
+      showThemedAlert('Дата початку', 'Формат дд/мм/рррр (наприклад 15/01/2026).');
       return;
     }
     onSave({ ...draft, startDate: startIso });
@@ -121,7 +147,7 @@ export function ProjectEditorModal({
           variant="secondary"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert(
+            showThemedAlert(
               'Повернути проєкт?',
               'Проєкт знову з’явиться серед активних.',
               [
@@ -149,7 +175,7 @@ export function ProjectEditorModal({
           variant="danger"
           style={{ flex: 1 }}
           onPress={() => {
-            Alert.alert('Видалити проєкт?', 'Повʼязані події та задачі теж будуть видалені.', [
+            showThemedAlert('Видалити проєкт?', 'Повʼязані події та задачі теж будуть видалені.', [
               { text: 'Скасувати', style: 'cancel' },
               {
                 text: 'Видалити',
@@ -227,7 +253,7 @@ export function ProjectEditorModal({
           editable={!readOnly}
           onChangeText={(t) => setDraft((x) => ({ ...x, color: t }))}
           placeholder="#2563EB"
-          style={{ marginTop: theme.spacing.sm }}
+          style={{ marginTop: t.spacing.sm }}
         />
       </FormField>
     </AppModal>
@@ -239,23 +265,3 @@ function startOfTodayIso(): string {
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
-
-const styles = StyleSheet.create({
-  badge: {
-    backgroundColor: '#E5E7EB',
-    padding: theme.spacing.sm,
-    borderRadius: theme.radius.sm,
-    marginBottom: theme.spacing.md,
-  },
-  badgeText: { fontWeight: '700', color: theme.colors.text },
-  badgeSub: { marginTop: 4, fontSize: 13, color: theme.colors.muted },
-  colorsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  swatch: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  swatchSelected: { borderColor: theme.colors.text },
-});

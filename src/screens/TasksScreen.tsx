@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
-import { theme } from '../theme/theme';
+import { useAppTheme } from '../store/ThemeContext';
 import { Card } from '../components/Card';
 import { FAB } from '../components/FAB';
 import { SegmentControl } from '../components/SegmentControl';
@@ -12,6 +15,7 @@ import { useTasks } from '../hooks/useTasks';
 import type { ModalMode, Task, TaskStatus } from '../types';
 import { getTaskCalendarDay } from '../utils/calendarHelpers';
 import { formatDateKey } from '../utils/dateTime';
+import type { TasksStackParamList } from '../navigation/types';
 
 type FilterKind = 'all' | 'project' | 'status';
 
@@ -24,7 +28,9 @@ const STATUS_OPTS: { key: TaskStatus; label: string }[] = [
 ];
 
 export function TasksScreen() {
-  const { projects, activeProjects } = useProjects();
+  const t = useAppTheme();
+  const navigation = useNavigation<NativeStackNavigationProp<TasksStackParamList, 'TasksMain'>>();
+  const { projects, activeProjects, activeTaskTypes } = useProjects();
   const { tasks, addTask, upsertTask, removeTask } = useTasks();
   const [filterKind, setFilterKind] = useState<FilterKind>('all');
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -42,6 +48,21 @@ export function TasksScreen() {
     }
   }, [filterKind, activeProjects, projectId]);
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          onPress={() => navigation.navigate('Focus')}
+          style={{ marginRight: 12, padding: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Фокус"
+        >
+          <Ionicons name="timer-outline" size={22} color={t.colors.accent} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, t.colors.accent]);
+
   const filtered = useMemo(() => {
     let list = tasks;
     if (filterKind === 'project' && projectId) {
@@ -57,6 +78,31 @@ export function TasksScreen() {
   }, [tasks, filterKind, projectId, status]);
 
   const dateKeyForTask = (t: Task) => formatDateKey(getTaskCalendarDay(t));
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        screen: {
+          flex: 1,
+          backgroundColor: t.colors.background,
+          padding: t.spacing.md,
+        },
+        hint: { marginTop: t.spacing.sm, color: t.colors.muted, fontSize: 14 },
+        heading: {
+          fontSize: 22,
+          fontWeight: '700',
+          color: t.colors.text,
+          marginBottom: t.spacing.md,
+        },
+        secondRow: { marginTop: t.spacing.sm },
+        list: { paddingTop: t.spacing.md, paddingBottom: t.spacing.xl },
+        card: { marginBottom: t.spacing.sm },
+        cardTitle: { fontSize: 16, fontWeight: '700', color: t.colors.text },
+        meta: { marginTop: 4, fontSize: 13, color: t.colors.muted },
+        empty: { color: t.colors.muted, marginTop: t.spacing.lg, textAlign: 'center' },
+      }),
+    [t],
+  );
 
   return (
     <View style={styles.screen}>
@@ -126,6 +172,7 @@ export function TasksScreen() {
         dateKey={modal?.task ? dateKeyForTask(modal.task) : formatDateKey(new Date())}
         initial={modal?.task ?? null}
         projectIds={projectOptions}
+        taskTypes={activeTaskTypes}
         onClose={() => setModal(null)}
         onRequestEdit={() =>
           modal?.task
@@ -146,24 +193,3 @@ export function TasksScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.md,
-  },
-  hint: { marginTop: theme.spacing.sm, color: theme.colors.muted, fontSize: 14 },
-  heading: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  secondRow: { marginTop: theme.spacing.sm },
-  list: { paddingTop: theme.spacing.md, paddingBottom: theme.spacing.xl },
-  card: { marginBottom: theme.spacing.sm },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: theme.colors.text },
-  meta: { marginTop: 4, fontSize: 13, color: theme.colors.muted },
-  empty: { color: theme.colors.muted, marginTop: theme.spacing.lg, textAlign: 'center' },
-});
