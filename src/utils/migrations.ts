@@ -92,25 +92,22 @@ export function focusSecondsOnDateKey(
   sessions: import('../types').FocusSession[],
   dateKey: string,
 ): number {
+  // Вся активна тривалість сесії зараховується до календарного дня, коли таймер було запущено.
+  // Важливо: використовуємо durationSeconds (активний час), а не wall-clock між startedAt/endedAt.
   let sec = 0;
-  const day = parseISO(`${dateKey}T12:00:00`);
-  const dayStart = startOfDay(day).getTime();
-  const dayEnd = dayStart + 86400000;
   for (const s of sessions) {
-    const a = new Date(s.startedAt).getTime();
-    const b = new Date(s.endedAt).getTime();
-    const lo = Math.max(a, dayStart);
-    const hi = Math.min(b, dayEnd);
-    if (hi > lo) sec += (hi - lo) / 1000;
+    try {
+      const startedKey = formatDateKey(startOfDay(parseISO(s.startedAt)));
+      if (startedKey === dateKey) sec += s.durationSeconds;
+    } catch {
+      // ignore invalid dates
+    }
   }
   return sec;
 }
 
-/** Мінімум фокусу за день / для збереження сесії — 1 година */
+/** Денна ціль фокусу за замовчуванням (в хвилинах) */
 export const MIN_FOCUS_MINUTES_FOR_PRODUCTIVE = 60;
-
-export const MIN_FOCUS_SECONDS_FOR_SESSION =
-  MIN_FOCUS_MINUTES_FOR_PRODUCTIVE * 60;
 
 export function isProductiveDay(
   dateKey: string,

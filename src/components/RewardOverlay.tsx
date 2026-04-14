@@ -53,7 +53,7 @@ export function RewardOverlay() {
               onPress={consumeReward}
               style={[styles.btn, { backgroundColor: t.colors.accent }]}
             >
-              <Text style={styles.btnTxt}>Супер!</Text>
+              <Text style={[styles.btnTxt, { color: t.colors.onAccent }]}>Супер!</Text>
             </Pressable>
           </Pressable>
         </Animated.View>
@@ -98,7 +98,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   btnTxt: {
-    color: '#fff',
     fontWeight: '700',
     fontSize: 16,
   },

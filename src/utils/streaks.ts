@@ -24,6 +24,7 @@ export function computeCurrentGlobalStreak(
   dayOffKeys: Set<string>,
   sessions: FocusSession[],
   tasks: Task[],
+  minFocusMin: number,
 ): number {
   let count = 0;
   let d = parseDateKey(todayKey);
@@ -33,7 +34,7 @@ export function computeCurrentGlobalStreak(
       d = subDays(d, 1);
       continue;
     }
-    if (isProductiveDay(key, sessions, tasks)) {
+    if (isProductiveDay(key, sessions, tasks, minFocusMin)) {
       count++;
       d = subDays(d, 1);
       continue;

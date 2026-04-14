@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {
   addMonths,
+  addDays,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
@@ -20,21 +21,26 @@ import {
   startOfMonth,
   startOfToday,
   startOfWeek,
+  subWeeks,
 } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { CalendarStackParamList } from '../navigation/types';
 import { useAppTheme } from '../store/ThemeContext';
 import { useAppData } from '../store/AppDataContext';
+import type { FocusSession, Task } from '../types';
 import { useEvents } from '../hooks/useEvents';
 import { useProjects } from '../hooks/useProjects';
 import { useTasks } from '../hooks/useTasks';
+import { Card } from '../components/Card';
+import { SegmentControl } from '../components/SegmentControl';
 import { eventOccursOnDay, taskOnDay } from '../utils/calendarHelpers';
 import { formatDateKey } from '../utils/dateTime';
 import { challengeAppliesOnDay } from '../utils/streaks';
+import { BarChart } from 'react-native-chart-kit';
 import {
   focusSecondsOnDateKey,
-  MIN_FOCUS_SECONDS_FOR_SESSION,
+  isProductiveDay,
 } from '../utils/migrations';
 
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
@@ -48,7 +54,8 @@ export function CalendarMonthScreen({ navigation }: Props) {
   const { events } = useEvents();
   const { tasks } = useTasks();
   const { projects } = useProjects();
-  const { dayOffs, challengesState, focusSessions } = useAppData();
+  const { dayOffs, challengesState, focusSessions, focusGoalMinutes } = useAppData();
+  const [weekOffset, setWeekOffset] = useState<0 | 1 | 2 | 3 | 4>(0);
 
   const today = startOfToday();
 
@@ -116,6 +123,14 @@ export function CalendarMonthScreen({ navigation }: Props) {
     return n;
   }, [dayOffs, cursor]);
 
+  const weekTitle = useMemo(() => {
+    const d = subWeeks(new Date(), weekOffset);
+    const a = startOfWeek(d, { weekStartsOn: 1 });
+    const b = addDays(a, 6);
+    const fmt = (x: Date) => format(x, 'd MMM', { locale: uk });
+    return `${fmt(a)} — ${fmt(b)}`;
+  }, [weekOffset]);
+
   return (
     <View
       style={{ flex: 1, backgroundColor: t.colors.background, padding: t.spacing.md }}
@@ -161,7 +176,7 @@ export function CalendarMonthScreen({ navigation }: Props) {
             (c) => !c.archived && challengeAppliesOnDay(c, day),
           );
           const focusSec = focusSecondsOnDateKey(focusSessions, key);
-          const hasFocus = focusSec >= MIN_FOCUS_SECONDS_FOR_SESSION;
+          const hasFocus = focusSec / 60 >= focusGoalMinutes;
 
           return (
             <Pressable
@@ -231,13 +246,165 @@ export function CalendarMonthScreen({ navigation }: Props) {
         </View>
         <View style={styles.legendRow}>
           <View style={[styles.dot, { backgroundColor: t.colors.focusHeat }]} />
-          <Text style={[styles.legendText, { color: t.colors.muted }]}>Фокус 1+ год</Text>
+          <Text style={[styles.legendText, { color: t.colors.muted }]}>
+            Фокус {focusGoalMinutes}+ хв
+          </Text>
         </View>
         <View style={styles.legendRow}>
           <Text style={[styles.legendText, { color: t.colors.muted }]}>Нижче — проєкт(и)</Text>
         </View>
       </View>
+
+      <View style={{ marginTop: t.spacing.lg }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: t.colors.text }}>
+            Обсяг роботи за тиждень
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: t.colors.muted }}>
+            {weekTitle}
+          </Text>
+        </View>
+
+        <View style={{ marginTop: 10 }}>
+          <SegmentControl
+            items={[
+              { key: '0', label: 'Цей' },
+              { key: '1', label: '−1' },
+              { key: '2', label: '−2' },
+              { key: '3', label: '−3' },
+              { key: '4', label: '−4' },
+            ]}
+            value={String(weekOffset) as '0' | '1' | '2' | '3' | '4'}
+            onChange={(k) => setWeekOffset(parseInt(k, 10) as 0 | 1 | 2 | 3 | 4)}
+          />
+        </View>
+
+        <WeeklyWorkDashboard
+          weekOffset={weekOffset}
+          focusGoalMinutes={focusGoalMinutes}
+          focusSessions={focusSessions}
+          tasks={tasks}
+        />
+      </View>
     </ScrollView>
+    </View>
+  );
+}
+
+function WeeklyWorkDashboard({
+  weekOffset,
+  focusGoalMinutes,
+  focusSessions,
+  tasks,
+}: {
+  weekOffset: 0 | 1 | 2 | 3 | 4;
+  focusGoalMinutes: number;
+  focusSessions: FocusSession[];
+  tasks: Task[];
+}) {
+  const t = useAppTheme();
+  const { width } = useWindowDimensions();
+  const chartWidth = Math.min(width - t.spacing.md * 2, 360);
+
+  const { labels, focusMin, doneTasks, productiveDays, totalFocusMin, totalDone } = useMemo(() => {
+    const base = subWeeks(startOfDay(new Date()), weekOffset);
+    const weekStart = startOfWeek(base, { weekStartsOn: 1 });
+    const weekEnd = addDays(weekStart, 6);
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    const labels: string[] = [];
+    const focusMin: number[] = [];
+    const doneTasks: number[] = [];
+    let productiveDays = 0;
+    let totalFocusSec = 0;
+    let totalDone = 0;
+
+    for (const d of days) {
+      const key = formatDateKey(d);
+      labels.push(String(d.getDate()));
+
+      const sec = focusSecondsOnDateKey(focusSessions, key);
+      totalFocusSec += sec;
+      focusMin.push(Math.round((sec / 60) * 10) / 10);
+
+      const done = tasks.filter((t) => t.status === 'done' && t.completedDateKey === key).length;
+      doneTasks.push(done);
+      totalDone += done;
+
+      if (isProductiveDay(key, focusSessions, tasks, focusGoalMinutes)) productiveDays += 1;
+    }
+
+    return {
+      labels,
+      focusMin,
+      doneTasks,
+      productiveDays,
+      totalFocusMin: Math.round((totalFocusSec / 60) * 10) / 10,
+      totalDone,
+    };
+  }, [focusGoalMinutes, focusSessions, tasks, weekOffset]);
+
+  const chartConfig = useMemo(
+    () => ({
+      backgroundGradientFrom: t.colors.card,
+      backgroundGradientTo: t.colors.card,
+      color: () => t.colors.accent,
+      labelColor: () => t.colors.muted,
+      barPercentage: 0.65,
+      propsForLabels: { fontSize: 11 },
+    }),
+    [t],
+  );
+
+  return (
+    <View style={{ marginTop: 12 }}>
+      <Card style={{ marginBottom: t.spacing.md }}>
+        <Text style={{ color: t.colors.muted, fontWeight: '800', fontSize: 13 }}>
+          Підсумок
+        </Text>
+        <Text style={{ color: t.colors.text, fontWeight: '900', fontSize: 18, marginTop: 6 }}>
+          {totalFocusMin} хв фокусу · {totalDone} завершених задач
+        </Text>
+        <Text style={{ color: t.colors.muted, marginTop: 6, lineHeight: 20 }}>
+          Продуктивних днів: {productiveDays}/7 (ціль фокусу: {focusGoalMinutes} хв/день).
+        </Text>
+        <Text style={{ color: t.colors.muted, marginTop: 8, lineHeight: 20 }}>
+          Це допомагає бачити прогрес і не знецінювати свою роботу — маленькі кроки додаються до великого результату.
+        </Text>
+      </Card>
+
+      <Text style={{ color: t.colors.muted, fontWeight: '800', fontSize: 13, marginBottom: 8 }}>
+        Концентрація (хв/день)
+      </Text>
+      <BarChart
+        data={{ labels, datasets: [{ data: focusMin.length ? focusMin : [0] }] }}
+        width={chartWidth}
+        height={200}
+        chartConfig={{ ...chartConfig, color: () => t.colors.focusHeat }}
+        style={{ borderRadius: t.radius.md, marginBottom: t.spacing.md }}
+        fromZero
+        withInnerLines={false}
+        yAxisLabel=""
+        yAxisSuffix=""
+      />
+
+      <Text style={{ color: t.colors.muted, fontWeight: '800', fontSize: 13, marginBottom: 8 }}>
+        Обсяг роботи (завершені задачі/день)
+      </Text>
+      <BarChart
+        data={{
+          labels,
+          datasets: [{ data: doneTasks.length ? doneTasks : [0] }],
+        }}
+        width={chartWidth}
+        height={200}
+        chartConfig={{ ...chartConfig, color: () => t.colors.task }}
+        style={{ borderRadius: t.radius.md, marginBottom: t.spacing.md }}
+        fromZero
+        withInnerLines={false}
+        yAxisLabel=""
+        yAxisSuffix=""
+      />
     </View>
   );
 }

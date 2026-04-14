@@ -79,7 +79,8 @@ export interface Transaction {
 export interface Challenge {
   id: string;
   name: string;
-  projectId: string;
+  /** null — без прив’язки до проєкту */
+  projectId: string | null;
   startDate: string;
   endDate: string;
   weekdays: WeekdayShort[];

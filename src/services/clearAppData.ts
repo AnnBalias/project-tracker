@@ -21,7 +21,9 @@ const emptyAchievements: AchievementsState = {
   globalStreak: { current: 0, best: 0 },
 };
 
-const THEME_KEY = '@project_tracker_theme_dark';
+const THEME_MODE_KEY = '@project_tracker_theme_mode';
+const LEGACY_DARK_KEY = '@project_tracker_theme_dark';
+const FOCUS_GOAL_KEY = '@project_tracker_focus_goal_minutes';
 
 /** Повне очищення доменних даних і службових ключів (локально). */
 export async function clearAllPersistedAppData(): Promise<void> {
@@ -39,5 +41,9 @@ export async function clearAllPersistedAppData(): Promise<void> {
   ]);
   await clearFocusTimer();
   await cancelEveningCheckInReminder();
-  await AsyncStorage.removeItem(THEME_KEY);
+  await Promise.all([
+    AsyncStorage.removeItem(THEME_MODE_KEY),
+    AsyncStorage.removeItem(LEGACY_DARK_KEY),
+    AsyncStorage.removeItem(FOCUS_GOAL_KEY),
+  ]);
 }

@@ -5,12 +5,14 @@ export type ColorPalette = {
   surface: string;
   text: string;
   accent: string;
+  onAccent: string;
   task: string;
   event: string;
   card: string;
   border: string;
   muted: string;
   danger: string;
+  onDanger: string;
   dimmedDay: string;
   overlay: string;
   focusHeat: string;
@@ -20,41 +22,46 @@ export type ColorPalette = {
 };
 
 export const lightColors: ColorPalette = {
-  background: '#F4F4F5',
-  surface: '#FAFAFA',
-  text: '#18181B',
-  accent: '#2563EB',
-  task: '#D97706',
-  event: '#2563EB',
+  background: '#EAF6EF',
+  surface: '#F4FBF7',
+  text: '#081B1B',
+  /** жовтий лишаємо для акцентів у світлій темі */
+  accent: '#EEE882',
+  onAccent: '#081B1B',
+  task: '#C18D52',
+  event: '#5A8F76',
   card: '#FFFFFF',
-  border: '#E4E4E7',
-  muted: '#71717A',
+  border: '#96CDB0',
+  muted: '#203B37',
   danger: '#DC2626',
-  dimmedDay: '#A1A1AA',
-  overlay: 'rgba(24, 24, 27, 0.45)',
-  focusHeat: '#7C3AED',
-  challenge: '#059669',
-  dayOff: '#93C5FD',
-  priority: { low: '#A1A1AA', medium: '#D97706', high: '#DC2626' },
+  onDanger: '#FFFFFF',
+  dimmedDay: '#5A8F76',
+  overlay: 'rgba(8, 27, 27, 0.28)',
+  focusHeat: '#5A8F76',
+  challenge: '#5A8F76',
+  dayOff: '#96CDB0',
+  priority: { low: '#5A8F76', medium: '#C18D52', high: '#DC2626' },
 };
 
 export const darkColors: ColorPalette = {
-  background: '#09090B',
-  surface: '#18181B',
-  text: '#FAFAFA',
-  accent: '#60A5FA',
-  task: '#FBBF24',
-  event: '#60A5FA',
-  card: '#18181B',
-  border: '#27272A',
-  muted: '#A1A1AA',
+  background: '#081B1B',
+  surface: '#203B37',
+  text: '#EEE882',
+  accent: '#EEE882',
+  onAccent: '#081B1B',
+  task: '#C18D52',
+  event: '#EEE882',
+  card: '#203B37',
+  border: '#5A8F76',
+  muted: '#96CDB0',
   danger: '#F87171',
-  dimmedDay: '#52525B',
-  overlay: 'rgba(0, 0, 0, 0.6)',
-  focusHeat: '#A78BFA',
-  challenge: '#34D399',
-  dayOff: '#1D4ED8',
-  priority: { low: '#71717A', medium: '#FBBF24', high: '#F87171' },
+  onDanger: '#081B1B',
+  dimmedDay: '#5A8F76',
+  overlay: 'rgba(8, 27, 27, 0.72)',
+  focusHeat: '#96CDB0',
+  challenge: '#5A8F76',
+  dayOff: '#96CDB0',
+  priority: { low: '#5A8F76', medium: '#C18D52', high: '#F87171' },
 };
 
 export const spacing = { xs: 6, sm: 10, md: 16, lg: 24, xl: 32 } as const;

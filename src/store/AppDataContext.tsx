@@ -8,6 +8,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import { formatISO } from 'date-fns';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { levelFromTotalXp } from '../utils/levels';
 import type {
   AchievementsState,
@@ -29,7 +30,7 @@ import { readJsonFile, writeJsonFile } from '../services/jsonFileStorage';
 import { createId } from '../utils/id';
 import { clearAllPersistedAppData } from '../services/clearAppData';
 import {
-  MIN_FOCUS_SECONDS_FOR_SESSION,
+  MIN_FOCUS_MINUTES_FOR_PRODUCTIVE,
   migrateChallengesState,
   migrateProfile,
   migrateTask,
@@ -83,6 +84,8 @@ type AppDataContextValue = {
   moodLogs: DailyCheckIn[];
   achievementsState: AchievementsState;
   focusSessions: FocusSession[];
+  focusGoalMinutes: number;
+  setFocusGoalMinutes: (min: number) => Promise<void>;
   loading: boolean;
   refresh: () => Promise<void>;
   rewardQueue: AchievementEvent[];
@@ -120,6 +123,8 @@ type AppDataContextValue = {
 };
 
 const AppDataContext = createContext<AppDataContextValue | null>(null);
+
+const FOCUS_GOAL_KEY = '@project_tracker_focus_goal_minutes';
 
 async function loadAll() {
   const [
@@ -191,6 +196,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [moodLogs, setMoodLogs] = useState<DailyCheckIn[]>([]);
   const [achievementsState, setAchievementsState] = useState<AchievementsState>(emptyAchievements);
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
+  const [focusGoalMinutes, setFocusGoalMinutesState] = useState<number>(
+    MIN_FOCUS_MINUTES_FOR_PRODUCTIVE,
+  );
   const [loading, setLoading] = useState(true);
   const [rewardQueue, setRewardQueue] = useState<AchievementEvent[]>([]);
 
@@ -219,6 +227,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       dayOffKeySet(data.dayOffs),
       data.focusSessions,
       data.tasks,
+      focusGoalMinutes,
     );
     const mergedAch: AchievementsState = {
       ...data.achievementsState,
@@ -231,11 +240,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setAchievementsState(mergedAch);
     setFocusSessions(data.focusSessions);
     await writeJsonFile('achievements', mergedAch);
-  }, []);
+  }, [focusGoalMinutes]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
+      try {
+        const raw = await AsyncStorage.getItem(FOCUS_GOAL_KEY);
+        const n = raw ? parseInt(raw, 10) : NaN;
+        if (!Number.isNaN(n) && n > 0 && n <= 24 * 60) setFocusGoalMinutesState(n);
+      } catch {
+        // ignore
+      }
       await refresh();
       setLoading(false);
     })();
@@ -250,6 +266,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       dayOffKeySet(dayOffs),
       focusSessions,
       tasks,
+      focusGoalMinutes,
     );
     setAchievementsState((ach) => {
       const newIds = collectNewAchievementIds(new Set(ach.unlocked), {
@@ -285,6 +302,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, [loading, tasks, transactions, focusSessions, dayOffs, pushRewards]);
+
+  const setFocusGoalMinutes = useCallback(async (min: number) => {
+    const next = Math.max(1, Math.min(24 * 60, Math.round(min)));
+    setFocusGoalMinutesState(next);
+    await AsyncStorage.setItem(FOCUS_GOAL_KEY, String(next));
+  }, []);
 
   const replaceProfile = useCallback(async (next: Profile) => {
     const m = migrateProfile(next);
@@ -341,11 +364,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setChallengesStateInner((prev) => {
       const next = {
         ...prev,
-        challenges: prev.challenges.filter((c) => c.projectId !== id),
-        completions: prev.completions.filter((c) => {
-          const ch = prev.challenges.find((x) => x.id === c.challengeId);
-          return ch && ch.projectId !== id;
-        }),
+        challenges: prev.challenges.map((c) =>
+          c.projectId === id ? { ...c, projectId: null } : c,
+        ),
       };
       void writeJsonFile('challenges', next);
       return next;
@@ -593,7 +614,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const durationSeconds = Math.round(
         segs.reduce((a, s) => a + s.activeMs, 0) / 1000,
       );
-      if (durationSeconds < MIN_FOCUS_SECONDS_FOR_SESSION) return null;
+      if (durationSeconds <= 0) return null;
       const session: FocusSession = {
         id: createId(),
         taskId: finalized.taskId,
@@ -620,6 +641,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           dayOffKeySet(dayOffs),
           newSessions,
           tasks,
+          focusGoalMinutes,
         );
         const unlocked = new Set(ach.unlocked);
         const newIds = collectNewAchievementIds(unlocked, {
@@ -649,7 +671,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
       return session;
     },
-    [dayOffs, focusSessions, pushRewards, tasks, transactions],
+    [dayOffs, focusGoalMinutes, focusSessions, pushRewards, tasks, transactions],
   );
 
   const removeFocusSession = useCallback(async (id: string) => {
@@ -679,6 +701,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         dayOffKeySet(dayOffs),
         focusSessions,
         tasks,
+        focusGoalMinutes,
       );
       const next = {
         ...ach,
@@ -691,7 +714,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       void writeJsonFile('achievements', next);
       return next;
     });
-  }, [dayOffs, focusSessions, tasks]);
+  }, [dayOffs, focusGoalMinutes, focusSessions, tasks]);
 
   const clearAllUserData = useCallback(async () => {
     await clearAllPersistedAppData();
@@ -721,6 +744,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         moodLogs,
         achievementsState,
         focusSessions,
+        focusGoalMinutes,
+        setFocusGoalMinutes,
         loading,
         refresh,
         rewardQueue,
@@ -765,6 +790,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       moodLogs,
       achievementsState,
       focusSessions,
+      focusGoalMinutes,
+      setFocusGoalMinutes,
       loading,
       refresh,
       rewardQueue,

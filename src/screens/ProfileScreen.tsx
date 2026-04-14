@@ -15,6 +15,7 @@ import { ProjectEditorModal } from '../components/ProjectEditorModal';
 import { TaskTypeEditorModal } from '../components/TaskTypeEditorModal';
 import { AppModal } from '../components/AppModal';
 import { Button } from '../components/Button';
+import { SegmentControl } from '../components/SegmentControl';
 import { useProjects } from '../hooks/useProjects';
 import type { ProfileStackParamList } from '../navigation/types';
 import type { Challenge, ExpenseCategory, ModalMode, Project, TaskType } from '../types';
@@ -92,10 +93,12 @@ export function ProfileScreen() {
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList, 'ProfileMain'>>();
-  const { toggleTheme, dark, setDark } = useThemeControls();
+  const { dark, setDark, mode, setMode } = useThemeControls();
   const {
     focusSessions,
     achievementsState,
+    focusGoalMinutes,
+    setFocusGoalMinutes,
     challengesState,
     upsertChallenge,
     removeChallenge,
@@ -115,6 +118,14 @@ export function ProfileScreen() {
     upsertTaskType,
     removeTaskType,
   } = useProjects();
+
+  const focusGoalKey = useMemo(() => {
+    const allowed = [30, 60, 90, 120] as const;
+    const closest = allowed.reduce((best, x) =>
+      Math.abs(x - focusGoalMinutes) < Math.abs(best - focusGoalMinutes) ? x : best,
+    );
+    return String(closest) as '30' | '60' | '90' | '120';
+  }, [focusGoalMinutes]);
 
   const [editor, setEditor] = useState<Editor>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
@@ -228,10 +239,31 @@ export function ProfileScreen() {
           </Text>
           <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
             <Button title="Рівні за проєктами" onPress={() => navigation.navigate('ProjectLevels')} />
-            <Button
-              title={dark ? 'Світла тема' : 'Темна тема'}
-              variant="secondary"
-              onPress={() => toggleTheme()}
+          </View>
+          <View style={{ marginTop: 12 }}>
+            <SegmentControl
+              items={[
+                { key: 'system', label: 'Система' },
+                { key: 'light', label: 'Світла' },
+                { key: 'dark', label: 'Темна' },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+          </View>
+          <View style={{ marginTop: 12 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: t.colors.muted, marginBottom: 6 }}>
+              Ціль фокусу на день (для стріку)
+            </Text>
+            <SegmentControl
+              items={[
+                { key: '30', label: '30 хв' },
+                { key: '60', label: '60 хв' },
+                { key: '90', label: '90 хв' },
+                { key: '120', label: '120 хв' },
+              ]}
+              value={focusGoalKey}
+              onChange={(k) => void setFocusGoalMinutes(parseInt(k, 10))}
             />
           </View>
         </View>

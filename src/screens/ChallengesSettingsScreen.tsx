@@ -23,7 +23,7 @@ export function ChallengesSettingsScreen({ route }: Props) {
   const { activeProjects } = useProjects();
 
   const projectOptions = useMemo(
-    () => activeProjects.map((p) => ({ id: p.id, name: p.name })),
+    () => [{ id: null, name: 'Без проєкту' }, ...activeProjects.map((p) => ({ id: p.id, name: p.name }))],
     [activeProjects],
   );
 

@@ -8,45 +8,72 @@ import React, {
   type ReactNode,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useColorScheme } from 'react-native';
 import type { AppTheme } from '../theme/palette';
 import { makeTheme } from '../theme/palette';
 
-const THEME_KEY = '@project_tracker_theme_dark';
+type ThemeMode = 'system' | 'light' | 'dark';
+
+const THEME_MODE_KEY = '@project_tracker_theme_mode';
+const LEGACY_DARK_KEY = '@project_tracker_theme_dark';
 
 const ThemeContext = createContext<{
   theme: AppTheme;
+  mode: ThemeMode;
+  setMode: (m: ThemeMode) => void;
+  /** @deprecated використовуйте setMode('dark' | 'light' | 'system') */
   setDark: (v: boolean) => void;
   toggleTheme: () => void;
 } | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [dark, setDarkState] = useState(false);
+  const systemScheme = useColorScheme();
+  const [mode, setModeState] = useState<ThemeMode>('system');
 
   useEffect(() => {
     (async () => {
-      const v = await AsyncStorage.getItem(THEME_KEY);
-      if (v === '1') setDarkState(true);
+      const storedMode = await AsyncStorage.getItem(THEME_MODE_KEY);
+      if (storedMode === 'system' || storedMode === 'light' || storedMode === 'dark') {
+        setModeState(storedMode);
+        return;
+      }
+
+      const legacy = await AsyncStorage.getItem(LEGACY_DARK_KEY);
+      if (legacy === '1' || legacy === '0') {
+        const migrated: ThemeMode = legacy === '1' ? 'dark' : 'light';
+        setModeState(migrated);
+        await AsyncStorage.setItem(THEME_MODE_KEY, migrated);
+        await AsyncStorage.removeItem(LEGACY_DARK_KEY);
+      }
     })();
   }, []);
 
-  const setDark = useCallback((v: boolean) => {
-    setDarkState(v);
-    void AsyncStorage.setItem(THEME_KEY, v ? '1' : '0');
+  const setMode = useCallback((m: ThemeMode) => {
+    setModeState(m);
+    void AsyncStorage.setItem(THEME_MODE_KEY, m);
   }, []);
 
+  const setDark = useCallback(
+    (v: boolean) => {
+      setMode(v ? 'dark' : 'light');
+    },
+    [setMode],
+  );
+
   const toggleTheme = useCallback(() => {
-    setDarkState((prev) => {
-      const next = !prev;
-      void AsyncStorage.setItem(THEME_KEY, next ? '1' : '0');
+    setModeState((prev) => {
+      const next: ThemeMode = prev === 'dark' ? 'light' : 'dark';
+      void AsyncStorage.setItem(THEME_MODE_KEY, next);
       return next;
     });
   }, []);
 
-  const theme = useMemo(() => makeTheme(dark), [dark]);
+  const effectiveDark = mode === 'dark' || (mode === 'system' && (systemScheme ?? 'light') === 'dark');
+  const theme = useMemo(() => makeTheme(effectiveDark), [effectiveDark]);
 
   const value = useMemo(
-    () => ({ theme, setDark, toggleTheme }),
-    [theme, setDark, toggleTheme],
+    () => ({ theme, mode, setMode, setDark, toggleTheme }),
+    [theme, mode, setMode, setDark, toggleTheme],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -61,5 +88,11 @@ export function useAppTheme(): AppTheme {
 export function useThemeControls() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error('useThemeControls needs ThemeProvider');
-  return { setDark: ctx.setDark, toggleTheme: ctx.toggleTheme, dark: ctx.theme.dark };
+  return {
+    setDark: ctx.setDark,
+    toggleTheme: ctx.toggleTheme,
+    dark: ctx.theme.dark,
+    mode: ctx.mode,
+    setMode: ctx.setMode,
+  };
 }

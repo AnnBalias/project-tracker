@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import {
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppTheme } from '../store/ThemeContext';
+import { useAppData } from '../store/AppDataContext';
 import { parseDateKey } from '../utils/dateTime';
 import { DrawerMenuButton } from './DrawerMenuButton';
 import type {
@@ -114,6 +115,7 @@ function CalendarFlow() {
         options={({ navigation }) => ({
           title: 'Календар',
           ...stackDrawerMenuButton(t, navigation),
+          headerRight: () => <CalendarBalanceHeaderRight />,
         })}
       />
       <CalendarStack.Screen
@@ -129,6 +131,27 @@ function CalendarFlow() {
         })}
       />
     </CalendarStack.Navigator>
+  );
+}
+
+function CalendarBalanceHeaderRight() {
+  const t = useAppTheme();
+  const { transactions } = useAppData();
+  const balance = transactions.reduce(
+    (sum, tx) => sum + (tx.type === 'income' ? tx.amount : -tx.amount),
+    0,
+  );
+  const color = balance >= 0 ? t.colors.accent : t.colors.danger;
+  return (
+    <View style={{ marginRight: 12, alignItems: 'flex-end' }}>
+      <Text style={{ fontSize: 11, fontWeight: '800', color: t.colors.muted }}>
+        Баланс
+      </Text>
+      <Text style={{ fontSize: 13, fontWeight: '900', color }}>
+        {balance >= 0 ? '+' : '−'}
+        {Math.abs(balance).toFixed(2)}
+      </Text>
+    </View>
   );
 }
 

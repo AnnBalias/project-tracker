@@ -29,7 +29,7 @@ export function FAB({ onPress, label = '+' }: Props) {
           shadowRadius: 4,
         },
         pressed: { opacity: 0.9 },
-        plus: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
+        plus: { color: t.colors.onAccent, fontSize: 28, fontWeight: '300', marginTop: -2 },
       }),
     [t],
   );

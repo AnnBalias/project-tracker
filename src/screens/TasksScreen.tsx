@@ -2,7 +2,6 @@ import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
 import { useAppTheme } from '../store/ThemeContext';
@@ -50,16 +49,7 @@ export function TasksScreen() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
-        <Pressable
-          onPress={() => navigation.navigate('Focus')}
-          style={{ marginRight: 12, padding: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Фокус"
-        >
-          <Ionicons name="timer-outline" size={22} color={t.colors.accent} />
-        </Pressable>
-      ),
+      headerRight: () => null,
     });
   }, [navigation, t.colors.accent]);
 

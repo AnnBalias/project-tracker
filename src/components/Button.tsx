@@ -54,9 +54,9 @@ export function Button({
       <Text
         style={[
           styles.label,
-          variant === 'primary' && styles.labelOnPrimary,
+          variant === 'primary' && { color: t.colors.onAccent },
           variant === 'secondary' && { color: t.colors.text },
-          variant === 'danger' && styles.labelOnPrimary,
+          variant === 'danger' && { color: t.colors.onDanger },
           variant === 'ghost' && { color: t.colors.accent },
           disabled && { color: t.colors.muted },
         ]}
@@ -75,5 +75,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.88 },
   disabled: { opacity: 0.45 },
   label: { fontSize: 15, fontWeight: '600', letterSpacing: 0.2 },
-  labelOnPrimary: { color: '#FFFFFF' },
 });

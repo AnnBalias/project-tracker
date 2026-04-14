@@ -14,13 +14,13 @@ type Props = {
   mode: ModalMode;
   onClose: () => void;
   initial?: Challenge | null;
-  projectIds: { id: string; name: string }[];
+  projectIds: { id: string | null; name: string }[];
   onSave: (c: Challenge) => void;
   onDelete?: (id: string) => void;
   onRequestEdit?: () => void;
 };
 
-function emptyChallenge(projectId: string): Challenge {
+function emptyChallenge(projectId: string | null): Challenge {
   const today = new Date().toISOString().slice(0, 10);
   return {
     id: '',
@@ -44,14 +44,14 @@ export function ChallengeEditorModal({
   onRequestEdit,
 }: Props) {
   const t = useAppTheme();
-  const defaultPid = projectIds[0]?.id ?? '';
+  const defaultPid = projectIds[0]?.id ?? null;
   const [draft, setDraft] = useState<Challenge>(() => emptyChallenge(defaultPid));
   const [days, setDays] = useState<Set<WeekdayShort>>(new Set());
 
   useEffect(() => {
     if (!visible) return;
     if (mode === 'create' || !initial) {
-      const b = emptyChallenge(defaultPid || '');
+      const b = emptyChallenge(defaultPid ?? null);
       setDraft(b);
       setDays(new Set());
       return;
@@ -75,10 +75,6 @@ export function ChallengeEditorModal({
   const persist = () => {
     if (!draft.name.trim()) {
       showThemedAlert('Назва', 'Вкажіть назву челенджу.');
-      return;
-    }
-    if (!draft.projectId) {
-      showThemedAlert('Проєкт', 'Оберіть проєкт.');
       return;
     }
     const wk = days.size ? Array.from(days) : [];
@@ -165,7 +161,7 @@ export function ChallengeEditorModal({
             const on = draft.projectId === p.id;
             return (
               <Pressable
-                key={p.id}
+                key={p.id ?? 'none'}
                 disabled={readOnly}
                 onPress={() => setDraft((d) => ({ ...d, projectId: p.id }))}
                 style={[
