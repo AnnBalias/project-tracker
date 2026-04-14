@@ -1,4 +1,5 @@
 export type TaskStatus = 'planned' | 'in_progress' | 'done' | 'canceled' | 'moved';
+export type TaskStage = 'planned' | 'in_progress' | 'review' | 'testing' | 'done';
 
 export type TransactionType = 'income' | 'expense';
 
@@ -51,15 +52,13 @@ export interface Task {
   id: string;
   title: string;
   description: string;
-  startTime: string;
-  endTime: string;
   projectId: string;
   status: TaskStatus;
   movedToDate?: string;
   typeId: string | null;
   number: number;
   priority: TaskPriority;
-  stage: string;
+  stage: TaskStage;
   startDate: string;
   endDate: string;
   /** Календарний день завершення (yyyy-MM-dd), коли статус став done */

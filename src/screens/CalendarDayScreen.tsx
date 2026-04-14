@@ -223,8 +223,7 @@ export function CalendarDayScreen({ navigation, route }: Props) {
             <Card style={styles.card}>
               <Text style={[styles.cardTitle, { color: t.colors.text }]}>{item.title}</Text>
               <Text style={[styles.cardMeta, { color: t.colors.muted }]}>
-                {format(parseISO(item.startTime), 'HH:mm')} —{' '}
-                {format(parseISO(item.endTime), 'HH:mm')} · {item.status}
+                {item.status} · {item.stage}
               </Text>
             </Card>
           </Pressable>

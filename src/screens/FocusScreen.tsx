@@ -7,8 +7,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { BarChart } from 'react-native-chart-kit';
-import { useRoute } from '@react-navigation/native';
-import type { RouteProp } from '@react-navigation/native';
 import { useFocusTimer } from '../store/FocusContext';
 import { useAppTheme } from '../store/ThemeContext';
 import { useAppData } from '../store/AppDataContext';
@@ -21,7 +19,7 @@ import {
 } from '../utils/migrations';
 import { formatDateKey } from '../utils/dateTime';
 import { subDays } from 'date-fns';
-import type { TasksStackParamList } from '../navigation/types';
+import type { TasksScreenProps } from '../navigation/types';
 
 function formatElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -31,7 +29,7 @@ function formatElapsed(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export function FocusScreen() {
+export function FocusScreen({ route }: TasksScreenProps<'Focus'>) {
   const t = useAppTheme();
   const { width } = useWindowDimensions();
   const { activeProjects } = useProjects();
@@ -39,8 +37,8 @@ export function FocusScreen() {
   const { focusSessions, appendFocusSessionFromTimer } = useAppData();
   const timer = useFocusTimer();
 
-  const route = useRoute<RouteProp<TasksStackParamList, 'Focus'>>();
-  const { taskId, projectId } = route.params;
+  const projectId = route.params.projectId;
+  const taskId = route.params.taskId;
 
   const taskLabel = (id: string | null) => {
     if (!id) return 'Без задачі';
@@ -49,16 +47,11 @@ export function FocusScreen() {
   };
 
   useEffect(() => {
-    // Фокус завжди прив’язаний до конкретної задачі.
+    if (!projectId) return;
     if (timer.projectId !== projectId || timer.taskId !== taskId) {
       timer.setTaskAndProject(taskId, projectId);
     }
-    // Авто-старт при заході з задачі.
-    if (!timer.isRunning && timer.elapsedSeconds === 0) {
-      timer.start();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, taskId]);
+  }, [projectId, taskId, timer]);
 
   const chartWidth = Math.min(width - t.spacing.md * 2, 360);
 
@@ -98,22 +91,11 @@ export function FocusScreen() {
       style={{ flex: 1, backgroundColor: t.colors.background }}
       contentContainerStyle={{ padding: t.spacing.md, paddingBottom: 40 }}
     >
-      <Card style={{ marginBottom: t.spacing.md }}>
-        <Text style={[styles.section, { color: t.colors.muted }]}>Задача</Text>
-        <Text style={{ color: t.colors.text, fontWeight: '800', fontSize: 16 }}>
-          {taskLabel(taskId)}
-        </Text>
-        <Text style={{ color: t.colors.muted, marginTop: 4 }}>
-          {activeProjects.find((p) => p.id === projectId)?.name ?? 'Проєкт'}
-        </Text>
-      </Card>
-
       <Card style={{ marginBottom: t.spacing.md, alignItems: 'center' }}>
         <Text style={[styles.timer, { color: t.colors.text }]}>{formatElapsed(timer.elapsedSeconds)}</Text>
         <Text style={[styles.xp, { color: t.colors.accent }]}>+{timer.sessionXpPreview.toFixed(1)} XP (попередньо)</Text>
         <Text style={[styles.bind, { color: t.colors.muted }]}>
-          {activeProjects.find((p) => p.id === timer.projectId)?.name ?? 'Оберіть проєкт'} ·{' '}
-          {taskLabel(timer.taskId)}
+          {activeProjects.find((p) => p.id === timer.projectId)?.name ?? 'Проєкт'} · {taskLabel(timer.taskId)}
         </Text>
         <View style={styles.row}>
           {!timer.isRunning && timer.elapsedSeconds === 0 ? (
@@ -121,6 +103,7 @@ export function FocusScreen() {
               title="Старт"
               style={styles.btn}
               onPress={() => {
+                if (!projectId) return;
                 timer.start();
               }}
             />

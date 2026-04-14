@@ -48,9 +48,7 @@ export function TasksScreen() {
   }, [filterKind, activeProjects, projectId]);
 
   useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => null,
-    });
+    navigation.setOptions({ headerRight: undefined });
   }, [navigation, t.colors.accent]);
 
   const filtered = useMemo(() => {
@@ -146,7 +144,7 @@ export function TasksScreen() {
               <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={styles.meta}>
                 {format(getTaskCalendarDay(item), 'd MMM yyyy', { locale: uk })} ·{' '}
-                {item.status}
+                {item.status} · {item.stage}
               </Text>
               <Text style={styles.meta} numberOfLines={1}>
                 {projects.find((p) => p.id === item.projectId)?.name ?? 'Проєкт'}
@@ -164,6 +162,7 @@ export function TasksScreen() {
         projectIds={projectOptions}
         taskTypes={activeTaskTypes}
         onClose={() => setModal(null)}
+        onStartFocus={(task) => navigation.navigate('Focus', { projectId: task.projectId, taskId: task.id })}
         onRequestEdit={() =>
           modal?.task
             ? setModal({ mode: 'edit', task: modal.task })

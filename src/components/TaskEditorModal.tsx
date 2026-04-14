@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ModalMode, Task, TaskPriority, TaskStatus } from '../types';
+import type { ModalMode, Task, TaskPriority, TaskStage, TaskStatus } from '../types';
 import { useAppTheme } from '../store/ThemeContext';
 import {
   calendarKeyToDisplay,
-  combineDateAndTime,
   displayToCalendarKey,
   formatDateKey,
   parseDateKey,
-  toTimeString,
 } from '../utils/dateTime';
 import { getTaskCalendarDay } from '../utils/calendarHelpers';
 import { AppModal } from './AppModal';
@@ -17,6 +15,15 @@ import { Button } from './Button';
 import { FormField } from './FormField';
 import { TextInputField } from './TextInputField';
 import { format } from 'date-fns';
+import { useAppData } from '../store/AppDataContext';
+
+function formatElapsed(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 type Props = {
   visible: boolean;
@@ -29,6 +36,7 @@ type Props = {
   onSave: (t: Task) => void;
   onDelete?: (id: string) => void;
   onRequestEdit?: () => void;
+  onStartFocus?: (task: Task) => void;
 };
 
 const PRIORITIES: { key: TaskPriority; label: string }[] = [
@@ -45,21 +53,26 @@ const STATUSES: { key: TaskStatus; label: string }[] = [
   { key: 'moved', label: 'Перенесено' },
 ];
 
+const STAGES: { key: TaskStage; label: string }[] = [
+  { key: 'planned', label: 'Заплановано' },
+  { key: 'in_progress', label: 'В процесі' },
+  { key: 'review', label: 'Перевірка' },
+  { key: 'testing', label: 'Тестування' },
+  { key: 'done', label: 'Виконано' },
+];
+
 function emptyTask(dateKey: string, projectId: string): Task {
-  const d = parseDateKey(dateKey);
   const ymd = dateKey;
   return {
     id: '',
     title: '',
     description: '',
-    startTime: combineDateAndTime(d, '09:00'),
-    endTime: combineDateAndTime(d, '10:00'),
     projectId,
     status: 'planned',
     typeId: null,
     number: 0,
     priority: 'medium',
-    stage: '',
+    stage: 'planned',
     startDate: ymd,
     endDate: ymd,
   };
@@ -75,13 +88,13 @@ export function TaskEditorModal({
   onSave,
   onDelete,
   onRequestEdit,
+  onStartFocus,
   taskTypes = [],
 }: Props) {
   const t = useAppTheme();
+  const { focusSessions } = useAppData();
   const defaultProjectId = projectIds[0]?.id ?? '';
   const [draft, setDraft] = useState<Task>(() => emptyTask(dateKey, defaultProjectId));
-  const [startHm, setStartHm] = useState('09:00');
-  const [endHm, setEndHm] = useState('10:00');
   const [movedDateDisplay, setMovedDateDisplay] = useState(() =>
     calendarKeyToDisplay(dateKey),
   );
@@ -97,8 +110,6 @@ export function TaskEditorModal({
     if (mode === 'create' || !initial) {
       const base = emptyTask(dateKey, defaultProjectId || '');
       setDraft(base);
-      setStartHm('09:00');
-      setEndHm('10:00');
       setMovedDateDisplay(calendarKeyToDisplay(dateKey));
       const dpy = calendarKeyToDisplay(dateKey);
       setStartDateDisplay(dpy);
@@ -106,8 +117,6 @@ export function TaskEditorModal({
       return;
     }
     setDraft(initial);
-    setStartHm(toTimeString(initial.startTime));
-    setEndHm(toTimeString(initial.endTime));
     setMovedDateDisplay(calendarKeyToDisplay(formatDateKey(getTaskCalendarDay(initial))));
     setStartDateDisplay(calendarKeyToDisplay(initial.startDate.slice(0, 10)));
     setEndDateDisplay(calendarKeyToDisplay(initial.endDate.slice(0, 10)));
@@ -149,13 +158,6 @@ export function TaskEditorModal({
       showThemedAlert('Дата перенесення', 'Формат дд/мм/рррр.');
       return;
     }
-    const d = parseDateKey(dayKey ?? dateKey);
-    const startTime = combineDateAndTime(d, startHm);
-    const endTime = combineDateAndTime(d, endHm);
-    if (new Date(endTime) <= new Date(startTime)) {
-      showThemedAlert('Час', 'Кінець має бути після початку.');
-      return;
-    }
     if (!draft.title.trim()) {
       showThemedAlert('Назва', 'Вкажіть назву.');
       return;
@@ -173,8 +175,6 @@ export function TaskEditorModal({
         : undefined;
     onSave({
       ...draft,
-      startTime,
-      endTime,
       startDate: sdKey,
       endDate: edKey,
       completedDateKey,
@@ -195,6 +195,16 @@ export function TaskEditorModal({
 
   const footer = (
     <>
+      {mode === 'view' && initial && onStartFocus ? (
+        <Button
+          title="Фокус"
+          style={{ flex: 1 }}
+          onPress={() => {
+            onStartFocus(initial);
+            onClose();
+          }}
+        />
+      ) : null}
       {mode === 'view' && onRequestEdit ? (
         <Button
           title="Редагувати"
@@ -253,6 +263,19 @@ export function TaskEditorModal({
       {draft.number > 0 ? (
         <Text style={styles.meta}>№ {draft.number}</Text>
       ) : null}
+      {mode === 'view' && initial ? (
+        (() => {
+          const secs = focusSessions
+            .filter((s) => s.taskId === initial.id)
+            .reduce((a, s) => a + s.durationSeconds, 0);
+          const sessionsCount = focusSessions.filter((s) => s.taskId === initial.id).length;
+          return (
+            <Text style={styles.meta}>
+              Фокус: {formatElapsed(secs)} · сесій: {sessionsCount}
+            </Text>
+          );
+        })()
+      ) : null}
       <View style={styles.row}>
         <View style={styles.flex}>
           <FormField label="Дата поч. (дд/мм/рррр)">
@@ -276,12 +299,23 @@ export function TaskEditorModal({
         </View>
       </View>
       <FormField label="Етап / стадія">
-        <TextInputField
-          value={draft.stage}
-          editable={!readOnly}
-          onChangeText={(t) => setDraft((x) => ({ ...x, stage: t }))}
-          placeholder="Напр. Розробка"
-        />
+        <View style={styles.chips}>
+          {STAGES.map((s) => {
+            const active = draft.stage === s.key;
+            return (
+              <Pressable
+                key={s.key}
+                disabled={readOnly}
+                onPress={() => setDraft((x) => ({ ...x, stage: s.key }))}
+                style={[styles.chip, active && styles.chipActive]}
+              >
+                <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+                  {s.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </FormField>
       <FormField label="Пріоритет">
         <View style={styles.chips}>
@@ -340,28 +374,6 @@ export function TaskEditorModal({
           />
         </FormField>
       ) : null}
-      <View style={styles.row}>
-        <View style={styles.flex}>
-          <FormField label="Початок">
-            <TextInputField
-              value={startHm}
-              editable={!readOnly}
-              onChangeText={setStartHm}
-              placeholder="09:00"
-            />
-          </FormField>
-        </View>
-        <View style={styles.flex}>
-          <FormField label="Кінець">
-            <TextInputField
-              value={endHm}
-              editable={!readOnly}
-              onChangeText={setEndHm}
-              placeholder="10:00"
-            />
-          </FormField>
-        </View>
-      </View>
       <FormField label="Статус">
         <View style={styles.chips}>
           {STATUSES.map((s) => {

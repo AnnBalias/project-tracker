@@ -1,5 +1,6 @@
 import { format, isSameDay, parseISO, startOfDay } from 'date-fns';
 import type { CalendarEvent, Task, WeekdayShort } from '../types';
+import { parseDateKey } from './dateTime';
 
 const weekdayToKey: Record<string, WeekdayShort> = {
   Mon: 'mon',
@@ -30,7 +31,7 @@ export function getTaskCalendarDay(task: Task): Date {
   if (task.status === 'moved' && task.movedToDate) {
     return startOfDay(parseISO(task.movedToDate));
   }
-  return startOfDay(parseISO(task.startTime));
+  return startOfDay(parseDateKey(task.startDate.slice(0, 10)));
 }
 
 export function taskOnDay(task: Task, day: Date): boolean {

@@ -9,7 +9,7 @@ export type CalendarStackParamList = {
 
 export type TasksStackParamList = {
   TasksMain: undefined;
-  Focus: { taskId: string; projectId: string };
+  Focus: { projectId: string; taskId: string };
 };
 
 export type NotesStackParamList = {
